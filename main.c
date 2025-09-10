@@ -48,6 +48,7 @@ STRUCT(DoublePerlinNoise)
 
 STRUCT(BiomeNoise)
 {
+    //i dont think this struct is necessary
     DoublePerlinNoise climate[NP_MAX];
     PerlinNoise oct[2*23]; // buffer for octaves in double perlin noise
     int nptype;
@@ -155,6 +156,7 @@ void xPerlinInit(PerlinNoise *noise, Xoroshiro *xr)
     //the y offset is a randomly generated number between 0 and 256
     //this controls the height of the noisemap, and also makes it 3d
     noise->yOffset = xNextDouble(xr) * 256.0;
+
     noise->zOffset = xNextDouble(xr) * 256.0;
     noise->amplitude = 1.0;
     noise->lacunarity = 1.0;
@@ -169,6 +171,7 @@ void xPerlinInit(PerlinNoise *noise, Xoroshiro *xr)
     }
 
     //shuffle
+
     for (i = 0; i < 256; i++)
     {
         int j = xNextInt(xr, 256 - i) + i;
@@ -318,14 +321,16 @@ double samplePerlin(const PerlinNoise *noise, double x, double z)
     x += noise->xOffset;
     z += noise->zOffset;
 
-    
-    double xNoisemap = floor(x);
-    double zNoisemap = floor(z);
-    x -= xNoisemap;
-    z -= zNoisemap;
+    //get the integer cell we're in
+    double xInt = floor(x);
+    double zInt = floor(z);
 
-    xOffsetFloor = (int) xNoisemap;
-    zOffsetFloor = (int) zNoisemap;
+    //restrict x and z to be only the fractional part. 0.0 - 1.0
+    x -= xInt;
+    z -= zInt;
+
+    xOffsetFloor = (int) xInt;
+    zOffsetFloor = (int) zInt;
 
     t1 = x*x*x * (x * (x*6.0-15.0) + 10.0);
     t3 = z*z*z * (z * (z*6.0-15.0) + 10.0);
@@ -404,6 +409,27 @@ void encodeOneStep(const char* filename, const unsigned char* image, unsigned wi
 
 int main(int argc, char** argv)
 {
+    //test code to generate a default noisemap
+
+    Xoroshiro xrng;
+    xSetSeed(&xrng, 0);
+
+    PerlinNoise perlinTest;
+    xPerlinInit(&perlinTest, &xrng);
+
+    unsigned char* buffer = (unsigned char*)malloc(1024 * 1024 * sizeof(unsigned char));
+    double pixel;
+    for(int x = 0; x < 1024; x++) {
+        for(int z = 0; z < 1024; z++) {
+            pixel = samplePerlin(&perlinTest, (double)x/16, (double)z/16);
+            pixel += 1;
+            pixel /= 2;
+            buffer[x*1024 + z] = (unsigned char)(256 * pixel) & 0xff;
+        }
+    }
+    encodeOneStep("raw.png", buffer, 1024, 1024);
+
+    return 0;
     //code to find low at zero
     //NP_CONTINENTALNESS internally is 2.
     uint64_t seed = 2551209;
@@ -416,9 +442,8 @@ int main(int argc, char** argv)
     //init biomenoise
     setClimateParaSeed(&bn, seed, large, 2, octave_max);
 
-    //unsigned char* buffer = (unsigned char*)malloc(1024 * 1024 * sizeof(unsigned char));
+    
     double checksum = 0;
-    double pixel;
     for(int x = 0; x < 1024; x++) {
         for(int z = 0; z < 1024; z++) {
             pixel = sampleDoublePerlin(bn.climate + 2, (double)x, (double)z);
@@ -427,6 +452,6 @@ int main(int argc, char** argv)
         }
     }
     printf("checksum: %lf (should be -180780.088673)\n", checksum);
-    //encodeOneStep("agaga.png", buffer, 1024, 1024);
+    encodeOneStep("agaga.png", buffer, 1024, 1024);
 
 }
