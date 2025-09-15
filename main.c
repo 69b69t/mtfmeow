@@ -24,8 +24,8 @@ enum
 //a single raw noisemap
 STRUCT(PerlinNoise)
 {
-    uint8_t gradients[256+1]; //shuffled bytes
-    uint8_t yOffsetInt; //y offset floor
+    uint8_t lookupHash[256+1]; //shuffled bytes
+    uint8_t yInt; //y offset floor
     double xOffset, yOffset, zOffset; //offsets of the current noisemap. x y and z
     double amplitude; //amplitude of the noisemap
     double lacunarity; //frequency of the noisemap
@@ -156,18 +156,23 @@ void xPerlinInit(PerlinNoise *noise, Xoroshiro *xr)
     //the y offset is a randomly generated number between 0 and 256
     //this controls the height of the noisemap, and also makes it 3d
     noise->yOffset = xNextDouble(xr) * 256.0;
-
     noise->zOffset = xNextDouble(xr) * 256.0;
+
+    //debug
+    // noise->xOffset = 0.0;
+    //noise->yOffset = 0.0;
+    // noise->zOffset = 0.0;
+
     noise->amplitude = 1.0;
     noise->lacunarity = 1.0;
 
     //get the pointer to noise values so we can easily work with them
-    uint8_t *gradients = noise->gradients;
+    uint8_t *lookupHash = noise->lookupHash;
 
     //init 256 identity permutation
     for (i = 0; i < 256; i++)
     {
-        gradients[i] = i;
+        lookupHash[i] = i;
     }
 
     //shuffle
@@ -175,29 +180,33 @@ void xPerlinInit(PerlinNoise *noise, Xoroshiro *xr)
     for (i = 0; i < 256; i++)
     {
         int j = xNextInt(xr, 256 - i) + i;
-        uint8_t n = gradients[i];
-        gradients[i] = gradients[j];
-        gradients[j] = n;
+        uint8_t n = lookupHash[i];
+        lookupHash[i] = lookupHash[j];
+        lookupHash[j] = n;
     }
 
     //protect against overflow, if we happen to be indexing with something
     //bigger than a u8
-    gradients[256] = gradients[0];
+    lookupHash[256] = lookupHash[0];
 
     //precompute integer and fractional part of the random y noise thing
-    double yOffsetInt = floor(noise->yOffset);
-    double yOffsetFract = noise->yOffset - yOffsetInt;
+    double yInt = floor(noise->yOffset);
+    double yOffsetFract = noise->yOffset - yInt;
+
+    //debug
+    printf("value is %f\n", yOffsetFract);
 
     //save values
-    noise->yOffsetInt = (int) yOffsetInt;
+    noise->yInt = (int) yInt;
     noise->yOffsetFract = yOffsetFract;
 
     //smooth(er)step between 0 and 1.
     noise->yFractSmoothstep = yOffsetFract*yOffsetFract*yOffsetFract * (yOffsetFract * (yOffsetFract*6.0-15.0) + 10.0);
+    //noise->yFractSmoothstep = yOffsetFract;
 }
 
 int xOctaveInit(OctaveNoise *noise, Xoroshiro *xr, PerlinNoise *octaves,
-        const double *amplitudes, int omin, int len, int nmax)
+        const double *amplitudes, int minimumOctave, int nmax)
 {
     //bunch of constants that shall be xor'd with xrng state
     static const uint64_t md5_octave_n[][2] = {
@@ -216,31 +225,38 @@ int xOctaveInit(OctaveNoise *noise, Xoroshiro *xr, PerlinNoise *octaves,
         {0xd50708086cef4d7c, 0x6e1651ecc7f43309}, // md5 "octave_0"
     };
     //scalings
-    static const double lacuna_ini[] = { // -omin = 3..12
+    static const double lacuna_ini[] = { // -minimumOctave = 3..12
         1, .5, .25, 1./8, 1./16, 1./32, 1./64, 1./128, 1./256, 1./512, 1./1024,
         1./2048, 1./4096,
     };
-    static const double persist_ini[] = { // len = 4..9
-        0, 1, 2./3, 4./7, 8./15, 16./31, 32./63, 64./127, 128./255, 256./511,
-    };
 
-    double lacuna = lacuna_ini[-omin];
-    double persist = persist_ini[len];
+    double lacuna = lacuna_ini[-minimumOctave];
+    double persist = 256./511;
     uint64_t xlo = xNextLong(xr);
     uint64_t xhi = xNextLong(xr);
     int i = 0, n = 0;
 
-    for (; i < len && n != nmax; i++, lacuna *= 2.0, persist *= 0.5)
+    for (; i < 9 && n != nmax; i++)
     {
-        if (amplitudes[i] == 0)
+        if (amplitudes[i] == 0) {
+            n++;
+            lacuna *= 2.0;
+            persist *= 0.5;
             continue;
+        }
+
         Xoroshiro pxr;
-        pxr.lo = xlo ^ md5_octave_n[12 + omin + i][0];
-        pxr.hi = xhi ^ md5_octave_n[12 + omin + i][1];
+
+        //this counts the last 
+        pxr.lo = xlo ^ md5_octave_n[12 + minimumOctave + i][0];
+        pxr.hi = xhi ^ md5_octave_n[12 + minimumOctave + i][1];
         xPerlinInit(&octaves[n], &pxr);
         octaves[n].amplitude = amplitudes[i] * persist;
         octaves[n].lacunarity = lacuna;
+
         n++;
+        lacuna *= 2.0;
+        persist *= 0.5;
     }
 
     noise->octaves = octaves;
@@ -249,16 +265,16 @@ int xOctaveInit(OctaveNoise *noise, Xoroshiro *xr, PerlinNoise *octaves,
 }
 
 int xDoublePerlinInit(DoublePerlinNoise *noise, Xoroshiro *xr,
-        PerlinNoise *octaves, const double *amplitudes, int omin, int len, int nmax)
+        PerlinNoise *octaves, const double *amplitudes, int minimumOctave, int nmax)
 {
-    int i, n = 0, na = -1, nb = -1;
+    int i, n = 0, na = -1, nb = -1, len = 9;
     if (nmax > 0)
     {
         na = (nmax + 1) >> 1;
         nb = nmax - na;
     }
-    n += xOctaveInit(&noise->octA, xr, octaves+n, amplitudes, omin, len, na);
-    n += xOctaveInit(&noise->octB, xr, octaves+n, amplitudes, omin, len, nb);
+    n += xOctaveInit(&noise->octA, xr, octaves+n, amplitudes, minimumOctave, na);
+    n += xOctaveInit(&noise->octB, xr, octaves+n, amplitudes, minimumOctave, nb);
 
     // trim amplitudes of zero
     for (i = len-1; i >= 0 && amplitudes[i] == 0.0; i--) len--;
@@ -283,7 +299,7 @@ static int init_climate_seed(
     // md5 "minecraft:continentalness" or "minecraft:continentalness_large"
     pxr.lo = xlo ^ (large ? 0x9a3f51a113fce8dc : 0x83886c9d0ae3a662);
     pxr.hi = xhi ^ (large ? 0xee2dbd157e5dcdad : 0xafa638a61b42e8ad);
-    n += xDoublePerlinInit(dpn, &pxr, oct, amp, large ? -11 : -9, 9, nmax);
+    n += xDoublePerlinInit(dpn, &pxr, oct, amp, large ? -11 : -9, nmax);
 
     return n;
 }
@@ -307,14 +323,12 @@ void setClimateParaSeed(BiomeNoise *bn, uint64_t seed, int large, int nptype, in
 //sample single perlin noisemap. this is the important bit
 double samplePerlin(const PerlinNoise *noise, double x, double z)
 {
-    uint8_t xOffsetFloor, yOffsetInt, zOffsetFloor;
+    uint8_t xInt, yInt, zInt;
     double t1, yFractSmoothstep, t3;
     double yOffsetFract = 0.0;
-    
-
 
     yOffsetFract = noise->yOffsetFract;
-    yOffsetInt = noise->yOffsetInt;
+    yInt = noise->yInt;
     yFractSmoothstep = noise->yFractSmoothstep;
 
     //shift the noisemap by xoffset and zoffset
@@ -322,48 +336,61 @@ double samplePerlin(const PerlinNoise *noise, double x, double z)
     z += noise->zOffset;
 
     //get the integer cell we're in
-    double xInt = floor(x);
-    double zInt = floor(z);
+    double xIntTemp = floor(x);
+    double zIntTemp = floor(z);
 
     //restrict x and z to be only the fractional part. 0.0 - 1.0
-    x -= xInt;
-    z -= zInt;
+    x -= xIntTemp;
+    z -= zIntTemp;
 
-    xOffsetFloor = (int) xInt;
-    zOffsetFloor = (int) zInt;
+    //cast the integer values to 
+    xInt = (int) xIntTemp;
+    zInt = (int) zIntTemp;
 
+    //smoothstep function. 
     t1 = x*x*x * (x * (x*6.0-15.0) + 10.0);
     t3 = z*z*z * (z * (z*6.0-15.0) + 10.0);
+    //t1 = x;
+    //t3 = z;
 
-    const uint8_t *gradients = noise->gradients;
+    const uint8_t *lookupHash = noise->lookupHash;
 
-    uint8_t a1 = gradients[xOffsetFloor]   + yOffsetInt;
-    uint8_t b1 = gradients[xOffsetFloor+1] + yOffsetInt;
+    //get psuedorandom values from a lookup table. this uses yInt to...?
+    //seems like it would entirely modify the noise past integer boundaries?
+    //upon further inspection, it seems to randomize gradient placement
+    uint8_t a1 = lookupHash[xInt]   + yInt;
+    uint8_t b1 = lookupHash[xInt+1] + yInt;
 
-    //seems to be lerping across a unit square
-    uint8_t a2 = gradients[a1]   + zOffsetFloor;
-    uint8_t b2 = gradients[b1]   + zOffsetFloor;
-    uint8_t a3 = gradients[a1+1] + zOffsetFloor;
-    uint8_t b3 = gradients[b1+1] + zOffsetFloor;
+    //printf("a1:%.2x b1:%.2x yInt:%d\n", a1, b1, yInt);
 
-    //evil. i dont understand. looks to be lerping between indicies of a unit cube
-    double l1 = indexedLerp(gradients[a2],   x,   yOffsetFract,   z);
-    double l2 = indexedLerp(gradients[b2],   x-1, yOffsetFract,   z);
-    double l3 = indexedLerp(gradients[a3],   x,   yOffsetFract-1, z);
-    double l4 = indexedLerp(gradients[b3],   x-1, yOffsetFract-1, z);
-    double l5 = indexedLerp(gradients[a2+1], x,   yOffsetFract,   z-1);
-    double l6 = indexedLerp(gradients[b2+1], x-1, yOffsetFract,   z-1);
-    double l7 = indexedLerp(gradients[a3+1], x,   yOffsetFract-1, z-1);
-    double l8 = indexedLerp(gradients[b3+1], x-1, yOffsetFract-1, z-1);
+    //gets more hashes, this time for the 
+    uint8_t a2 = lookupHash[a1]   + zInt;
+    uint8_t b2 = lookupHash[b1]   + zInt;
+    uint8_t a3 = lookupHash[a1+1] + zInt;
+    uint8_t b3 = lookupHash[b1+1] + zInt;
+    //printf("a2:%.2x b2:%.2x a3:%.2x b3:%.2x \n\n", a2, b2, a3, b3);
 
+    //computes the gradients 
+    double l1 = indexedLerp(lookupHash[a2],   x,   yOffsetFract,   z);
+    double l2 = indexedLerp(lookupHash[b2],   x-1, yOffsetFract,   z);
+    double l3 = indexedLerp(lookupHash[a3],   x,   yOffsetFract-1, z);
+    double l4 = indexedLerp(lookupHash[b3],   x-1, yOffsetFract-1, z);
+    double l5 = indexedLerp(lookupHash[a2+1], x,   yOffsetFract,   z-1);
+    double l6 = indexedLerp(lookupHash[b2+1], x-1, yOffsetFract,   z-1);
+    double l7 = indexedLerp(lookupHash[a3+1], x,   yOffsetFract-1, z-1);
+    double l8 = indexedLerp(lookupHash[b3+1], x-1, yOffsetFract-1, z-1);
+
+    //linearlly interpolate down to 2d(on the x axis)
     l1 = lerp(t1, l1, l2);
     l3 = lerp(t1, l3, l4);
     l5 = lerp(t1, l5, l6);
     l7 = lerp(t1, l7, l8);
 
+    //linearlly interpolate down to 1d(on the y axis)
     l1 = lerp(yFractSmoothstep, l1, l3);
     l5 = lerp(yFractSmoothstep, l5, l7);
 
+    //linearlly interpolate down to 0d(on the z axis)
     return lerp(t3, l1, l5);
 }
 
@@ -407,15 +434,25 @@ void encodeOneStep(const char* filename, const unsigned char* image, unsigned wi
   if(error) printf("error %u: %s\n", error, lodepng_error_text(error));
 }
 
-int main(int argc, char** argv)
-{
+void genImage(uint64_t frame) {
     //test code to generate a default noisemap
 
+    double y = frame / 1024.0;
+    char* fileName;
+    asprintf(&fileName, "images/%.4ld.png", frame);
+
     Xoroshiro xrng;
-    xSetSeed(&xrng, 0);
+    xSetSeed(&xrng, 1);
 
     PerlinNoise perlinTest;
     xPerlinInit(&perlinTest, &xrng);
+
+    //manually modify noise height
+    perlinTest.yInt = (int) floor(y);
+    perlinTest.yOffsetFract = y - floor(y);
+
+    //smooth(er)step between 0 and 1.
+    perlinTest.yFractSmoothstep = perlinTest.yOffsetFract*perlinTest.yOffsetFract*perlinTest.yOffsetFract * (perlinTest.yOffsetFract * (perlinTest.yOffsetFract*6.0-15.0) + 10.0);
 
     unsigned char* buffer = (unsigned char*)malloc(1024 * 1024 * sizeof(unsigned char));
     double pixel;
@@ -427,9 +464,55 @@ int main(int argc, char** argv)
             buffer[x*1024 + z] = (unsigned char)(256 * pixel) & 0xff;
         }
     }
-    encodeOneStep("raw.png", buffer, 1024, 1024);
+    encodeOneStep(fileName, buffer, 1024, 1024);
+}
 
-    return 0;
+int main(int argc, char** argv)
+{
+    /*
+    uint64_t records[] = {
+        -3649752726839234647ULL,
+        0ULL,
+        69ULL,
+        420ULL,
+        1337ULL,
+        8232025ULL,
+        9112001ULL,
+        69696969ULL,
+        420420420420ULL,
+        0x706F6C7974726F6EULL,
+    };
+
+    BiomeNoise bn;
+    for(int i = 0; i < sizeof(records)/sizeof(uint64_t); i++) {
+        printf("%lld\n", records[i]);
+        setClimateParaSeed(&bn, records[i], 1, NP_CONTINENTALNESS, 4);
+        printf("\n");
+    }
+    */
+    
+
+    /*
+    for(int n = 0; n < 1024; n++) {
+        genImage(n);
+    }
+    */
+
+    /*
+    //inefficiently find crunchy noisemaps
+    PerlinNoise perlinTest;
+    Xoroshiro xrng;
+    for(int n = 0; n < 1000000; n++) {
+        xSetSeed(&xrng, n);
+        xPerlinInit(&perlinTest, &xrng);
+        if(fabs(perlinTest.yOffsetFract - 0.0) < 0.00001) {
+            printf("%d\n", n);
+        }
+    }
+    */
+
+
+
     //code to find low at zero
     //NP_CONTINENTALNESS internally is 2.
     uint64_t seed = 2551209;
@@ -446,12 +529,11 @@ int main(int argc, char** argv)
     double checksum = 0;
     for(int x = 0; x < 1024; x++) {
         for(int z = 0; z < 1024; z++) {
-            pixel = sampleDoublePerlin(bn.climate + 2, (double)x, (double)z);
-            checksum += pixel;
-            //buffer[x*1024 + z] = (unsigned char)(256 * pixel) & 0xff;
+            checksum += sampleDoublePerlin(bn.climate + 2, (double)x, (double)z);
         }
     }
     printf("checksum: %lf (should be -180780.088673)\n", checksum);
-    encodeOneStep("agaga.png", buffer, 1024, 1024);
 
+
+    return 0;
 }
