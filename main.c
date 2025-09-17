@@ -33,26 +33,19 @@ STRUCT(PerlinNoise)
     double yFractSmoothstep; //precomputed noisestep of something. maybe y offset?
 };
 
+//a bunch of stacked noisemaps
 STRUCT(OctaveNoise)
 {
     int octcnt; //number of octaves
-    PerlinNoise *octaves; //the noise for each octave
+    PerlinNoise *octaves;
 };
 
+//two octave noisemaps that get stacked
 STRUCT(DoublePerlinNoise)
 {
     double amplitude;
     OctaveNoise octA;
     OctaveNoise octB;
-};
-
-STRUCT(BiomeNoise)
-{
-    //i dont think this struct is necessary
-    DoublePerlinNoise climate[NP_MAX];
-    PerlinNoise oct[2*23]; // buffer for octaves in double perlin noise
-    int nptype;
-    int mc;
 };
 
 //==================RNG================
@@ -205,9 +198,11 @@ void xPerlinInit(PerlinNoise *noise, Xoroshiro *xr)
     //noise->yFractSmoothstep = yOffsetFract;
 }
 
-int xOctaveInit(OctaveNoise *noise, Xoroshiro *xr, PerlinNoise *octaves,
-        const double *amplitudes, int minimumOctave, int nmax)
+int xOctaveInit(OctaveNoise *noise, Xoroshiro *xr, PerlinNoise *octaves, int minimumOctave, int nmax)
 {
+    //this function initializes stacked octaves
+
+
     //bunch of constants that shall be xor'd with xrng state
     static const uint64_t md5_octave_n[][2] = {
         {0xb198de63a8012672, 0x7b84cad43ef7b5a8}, // md5 "octave_-12"
@@ -224,6 +219,7 @@ int xOctaveInit(OctaveNoise *noise, Xoroshiro *xr, PerlinNoise *octaves,
         {0xdffa22b534c5f608, 0xb9b67517d3665ca9}, // md5 "octave_-1"
         {0xd50708086cef4d7c, 0x6e1651ecc7f43309}, // md5 "octave_0"
     };
+
     //scalings
     static const double lacuna_ini[] = { // -minimumOctave = 3..12
         1, .5, .25, 1./8, 1./16, 1./32, 1./64, 1./128, 1./256, 1./512, 1./1024,
@@ -234,51 +230,45 @@ int xOctaveInit(OctaveNoise *noise, Xoroshiro *xr, PerlinNoise *octaves,
     double persist = 256./511;
     uint64_t xlo = xNextLong(xr);
     uint64_t xhi = xNextLong(xr);
-    int i = 0, n = 0;
+    int i;
 
-    for (; i < 9 && n != nmax; i++)
+    static const double amplitudes[] = {1, 1, 2, 2, 2, 1, 1, 1, 1};
+
+    for (i = 0; i < 9 && i != nmax; i++)
     {
-        if (amplitudes[i] == 0) {
-            n++;
-            lacuna *= 2.0;
-            persist *= 0.5;
-            continue;
-        }
-
         Xoroshiro pxr;
 
-        //this counts the last 
+        //this counts the last 9 octaves minimumOctave
         pxr.lo = xlo ^ md5_octave_n[12 + minimumOctave + i][0];
         pxr.hi = xhi ^ md5_octave_n[12 + minimumOctave + i][1];
-        xPerlinInit(&octaves[n], &pxr);
-        octaves[n].amplitude = amplitudes[i] * persist;
-        octaves[n].lacunarity = lacuna;
+        xPerlinInit(&octaves[i], &pxr);
+        octaves[i].amplitude = amplitudes[i] * persist;
+        octaves[i].lacunarity = lacuna;
 
-        n++;
         lacuna *= 2.0;
         persist *= 0.5;
     }
 
     noise->octaves = octaves;
-    noise->octcnt = n;
-    return n;
+    noise->octcnt = i;
+    return i;
 }
 
 int xDoublePerlinInit(DoublePerlinNoise *noise, Xoroshiro *xr,
-        PerlinNoise *octaves, const double *amplitudes, int minimumOctave, int nmax)
+        PerlinNoise *octaves, int minimumOctave, int nmax)
 {
-    int i, n = 0, na = -1, nb = -1, len = 9;
+    int n = 0, na = -1, nb = -1, len = 9;
     if (nmax > 0)
     {
         na = (nmax + 1) >> 1;
         nb = nmax - na;
     }
-    n += xOctaveInit(&noise->octA, xr, octaves+n, amplitudes, minimumOctave, na);
-    n += xOctaveInit(&noise->octB, xr, octaves+n, amplitudes, minimumOctave, nb);
 
-    // trim amplitudes of zero
-    for (i = len-1; i >= 0 && amplitudes[i] == 0.0; i--) len--;
-    for (i = 0; amplitudes[i] == 0.0; i++) len--;
+    //init the first octave noise in double perlin noise
+    n += xOctaveInit(&noise->octA, xr, octaves, minimumOctave, na);
+
+    //second octave noise
+    n += xOctaveInit(&noise->octB, xr, octaves+n, minimumOctave, nb);
 
     static const double amp_ini[] = { // (5 ./ 3) * len / (len + 1), len = 2..9
         0, 5./6, 10./9, 15./12, 20./15, 25./18, 30./21, 35./24, 40./27, 45./30,
@@ -287,33 +277,17 @@ int xDoublePerlinInit(DoublePerlinNoise *noise, Xoroshiro *xr,
     return n;
 }
 
-static int init_climate_seed(
+static void init_climate_seed(
     DoublePerlinNoise *dpn, PerlinNoise *oct,
-    uint64_t xlo, uint64_t xhi, int large, int nptype, int nmax
+    uint64_t xlo, uint64_t xhi, int large, int nmax
     )
 {
     Xoroshiro pxr;
-    int n = 0;
 
-    static const double amp[] = {1, 1, 2, 2, 2, 1, 1, 1, 1};
     // md5 "minecraft:continentalness" or "minecraft:continentalness_large"
     pxr.lo = xlo ^ (large ? 0x9a3f51a113fce8dc : 0x83886c9d0ae3a662);
     pxr.hi = xhi ^ (large ? 0xee2dbd157e5dcdad : 0xafa638a61b42e8ad);
-    n += xDoublePerlinInit(dpn, &pxr, oct, amp, large ? -11 : -9, nmax);
-
-    return n;
-}
-
-void setClimateParaSeed(BiomeNoise *bn, uint64_t seed, int large, int nptype, int nmax)
-{
-    Xoroshiro pxr;
-    xSetSeed(&pxr, seed);
-    uint64_t xlo = xNextLong(&pxr);
-    uint64_t xhi = xNextLong(&pxr);
-
-    init_climate_seed(bn->climate + nptype, bn->oct, xlo, xhi, large, nptype, nmax);
-
-    bn->nptype = nptype;
+    xDoublePerlinInit(dpn, &pxr, oct, large ? -11 : -9, nmax);
 }
 
 //===========================END_INIT=====================
@@ -469,67 +443,26 @@ void genImage(uint64_t frame) {
 
 int main(int argc, char** argv)
 {
-    /*
-    uint64_t records[] = {
-        -3649752726839234647ULL,
-        0ULL,
-        69ULL,
-        420ULL,
-        1337ULL,
-        8232025ULL,
-        9112001ULL,
-        69696969ULL,
-        420420420420ULL,
-        0x706F6C7974726F6EULL,
-    };
-
-    BiomeNoise bn;
-    for(int i = 0; i < sizeof(records)/sizeof(uint64_t); i++) {
-        printf("%lld\n", records[i]);
-        setClimateParaSeed(&bn, records[i], 1, NP_CONTINENTALNESS, 4);
-        printf("\n");
-    }
-    */
-    
-
-    /*
-    for(int n = 0; n < 1024; n++) {
-        genImage(n);
-    }
-    */
-
-    /*
-    //inefficiently find crunchy noisemaps
-    PerlinNoise perlinTest;
-    Xoroshiro xrng;
-    for(int n = 0; n < 1000000; n++) {
-        xSetSeed(&xrng, n);
-        xPerlinInit(&perlinTest, &xrng);
-        if(fabs(perlinTest.yOffsetFract - 0.0) < 0.00001) {
-            printf("%d\n", n);
-        }
-    }
-    */
-
-
-
-    //code to find low at zero
-    //NP_CONTINENTALNESS internally is 2.
     uint64_t seed = 2551209;
     int large = 0;
     int octave_max = -1;
 
-    //create biomenoise
-    BiomeNoise bn;
+    Xoroshiro pxr;
+    xSetSeed(&pxr, seed);
+    uint64_t xlo = xNextLong(&pxr);
+    uint64_t xhi = xNextLong(&pxr);
 
-    //init biomenoise
-    setClimateParaSeed(&bn, seed, large, 2, octave_max);
+    DoublePerlinNoise dpn;
+    PerlinNoise octaves[2*23]; //this is all the noisemaps
+
+
+    init_climate_seed(&dpn, octaves, xlo, xhi, large, octave_max);
 
     
     double checksum = 0;
     for(int x = 0; x < 1024; x++) {
         for(int z = 0; z < 1024; z++) {
-            checksum += sampleDoublePerlin(bn.climate + 2, (double)x, (double)z);
+            checksum += sampleDoublePerlin(&dpn, (double)x, (double)z);
         }
     }
     printf("checksum: %lf (should be -180780.088673)\n", checksum);
