@@ -228,6 +228,7 @@ int xOctaveInit(OctaveNoise *noise, Xoroshiro *xr, PerlinNoise *octaves, int min
 
     double lacuna = lacuna_ini[-minimumOctave];
     double persist = 256./511;
+
     uint64_t xlo = xNextLong(xr);
     uint64_t xhi = xNextLong(xr);
     int i;
@@ -238,9 +239,11 @@ int xOctaveInit(OctaveNoise *noise, Xoroshiro *xr, PerlinNoise *octaves, int min
     {
         Xoroshiro pxr;
 
-        //this counts the last 9 octaves minimumOctave
+        //this counts the last 9 octaves
+        //printf("before hash: %.16lx %.16lx\n", xhi, xlo);
         pxr.lo = xlo ^ md5_octave_n[12 + minimumOctave + i][0];
         pxr.hi = xhi ^ md5_octave_n[12 + minimumOctave + i][1];
+        printf("before xPerlinInit: %.16lx %.16lx\n", pxr.hi, pxr.lo);
         xPerlinInit(&octaves[i], &pxr);
         octaves[i].amplitude = amplitudes[i] * persist;
         octaves[i].lacunarity = lacuna;
@@ -248,6 +251,8 @@ int xOctaveInit(OctaveNoise *noise, Xoroshiro *xr, PerlinNoise *octaves, int min
         lacuna *= 2.0;
         persist *= 0.5;
     }
+
+    //printf("after xOctaveInit: %.16lx %.16lx\n", xhi, xlo);
 
     noise->octaves = octaves;
     noise->octcnt = i;
@@ -258,17 +263,25 @@ int xDoublePerlinInit(DoublePerlinNoise *noise, Xoroshiro *xr,
         PerlinNoise *octaves, int minimumOctave, int nmax)
 {
     int n = 0, na = -1, nb = -1, len = 9;
+
+    //this splits the octaves so na + nb = nmax BUT na gets more if its odd.
+    //this is so we evenly spread the octaves
     if (nmax > 0)
     {
         na = (nmax + 1) >> 1;
         nb = nmax - na;
     }
 
-    //init the first octave noise in double perlin noise
+    printf("before xOctaveInit: %.16lx %.16lx\n", xr->hi, xr->lo);
+
+    //init the first octave noise in double perlin noise. na is octave count
     n += xOctaveInit(&noise->octA, xr, octaves, minimumOctave, na);
+    printf("after xOctaveInitA: %.16lx %.16lx\n", xr->hi, xr->lo);
 
     //second octave noise
     n += xOctaveInit(&noise->octB, xr, octaves+n, minimumOctave, nb);
+    printf("after xOctaveInitB: %.16lx %.16lx\n", xr->hi, xr->lo);
+
 
     static const double amp_ini[] = { // (5 ./ 3) * len / (len + 1), len = 2..9
         0, 5./6, 10./9, 15./12, 20./15, 25./18, 30./21, 35./24, 40./27, 45./30,
@@ -287,6 +300,8 @@ static void init_climate_seed(
     // md5 "minecraft:continentalness" or "minecraft:continentalness_large"
     pxr.lo = xlo ^ (large ? 0x9a3f51a113fce8dc : 0x83886c9d0ae3a662);
     pxr.hi = xhi ^ (large ? 0xee2dbd157e5dcdad : 0xafa638a61b42e8ad);
+
+    //printf("in initClimateSeed: %.16lx %.16lx\n", pxr.hi, pxr.lo);
     xDoublePerlinInit(dpn, &pxr, oct, large ? -11 : -9, nmax);
 }
 
@@ -445,7 +460,7 @@ int main(int argc, char** argv)
 {
     uint64_t seed = 2551209;
     int large = 0;
-    int octave_max = -1;
+    int octave_max = 2;
 
     Xoroshiro pxr;
     xSetSeed(&pxr, seed);
@@ -465,7 +480,7 @@ int main(int argc, char** argv)
             checksum += sampleDoublePerlin(&dpn, (double)x, (double)z);
         }
     }
-    printf("checksum: %lf (should be -180780.088673)\n", checksum);
+    //printf("checksum: %lf (should be -180780.088673)\n", checksum);
 
 
     return 0;
