@@ -43,7 +43,7 @@ static inline double xNextDouble(Xoroshiro *xr)
     return (xNextLong(xr) >> (64-53)) * 1.1102230246251565E-16;
 }
 
-double calculateCrunchiness(Xoroshiro state, int large, int octaveNumber)
+double calculateCrunchiness(Xoroshiro state, int large, int octave)
 {
     static const uint64_t md5_octave_n[][2] = {
         {0xb198de63a8012672, 0x7b84cad43ef7b5a8}, // md5 "octave_-12"
@@ -62,8 +62,8 @@ double calculateCrunchiness(Xoroshiro state, int large, int octaveNumber)
     };
 
     int minimumOctave = large ? -11 : -9;
-    state.lo = state.lo ^ md5_octave_n[12 + minimumOctave + octaveNumber][0];
-    state.hi = state.hi ^ md5_octave_n[12 + minimumOctave + octaveNumber][1];
+    state.lo = state.lo ^ md5_octave_n[12 + minimumOctave + octave][0];
+    state.hi = state.hi ^ md5_octave_n[12 + minimumOctave + octave][1];
 
     //burn a state. slightly faster than xNextDouble
     xNextLong(&state);
@@ -92,4 +92,10 @@ void initOctaveSeeds(Xoroshiro *octASeed, Xoroshiro *octBSeed, uint64_t seed, in
     octASeed->hi = xNextLong(&xr);
     octBSeed->lo = xNextLong(&xr);
     octBSeed->hi = xNextLong(&xr);
+}
+
+//calculate MAD for octaves up to n
+double calculateMAD(Xoroshiro *octaveSeed, int large, int octave) {
+    double crunchiness = calculateCrunchiness(octaveSeed, large, octave);
+    
 }
