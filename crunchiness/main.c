@@ -4,18 +4,20 @@
 #include "crunchLib.h"
 
 int main() {
-    uint64_t seed = 2551209;
+    //uint64_t seed = 2551209;
 
     //large check
     int large = 0;
 
     Xoroshiro octASeed, octBSeed;
-    initOctaveSeeds(&octASeed, &octBSeed, seed, large);
+    
+    for(uint64_t i = 0; i < 1000000000ULL; i++)
+    {
+        initOctaveSeeds(&octASeed, &octBSeed, i, large);
 
-    //make a memory copy, this is necessary
-    double crunch0a = calculateCrunchiness(octASeed, large, 0);
-    double crunch0b = calculateCrunchiness(octBSeed, large, 0);
-
-    printf("0a:%f 0b:%f", crunch0a, crunch0b);
+        //double doubleMad(Xoroshiro octaveSeedA, Xoroshiro octaveSeedB, int large) {
+        double mad = doubleMad(octASeed, octBSeed, large);
+        if (mad < 0.003) printf("%ld\n", i);
+    }
     return 0;
 }

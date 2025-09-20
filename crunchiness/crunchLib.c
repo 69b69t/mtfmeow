@@ -1,15 +1,14 @@
-#include <stdio.h>
 #include <stdint.h>
 #include <math.h>
 
 #include "crunchLib.h"
 
-uint64_t rotl64(uint64_t x, uint8_t b)
+inline uint64_t rotl64(uint64_t x, uint8_t b)
 {
     return (x << b) | (x >> (64-b));
 }
 
-static inline void xSetSeed(Xoroshiro *xr, uint64_t value)
+inline void xSetSeed(Xoroshiro *xr, uint64_t value)
 {
     const uint64_t XL = 0x9e3779b97f4a7c15ULL;
     const uint64_t XH = 0x6a09e667f3bcc909ULL;
@@ -27,7 +26,7 @@ static inline void xSetSeed(Xoroshiro *xr, uint64_t value)
     xr->hi = h;
 }
 
-static inline uint64_t xNextLong(Xoroshiro *xr)
+inline uint64_t xNextLong(Xoroshiro *xr)
 {
     uint64_t l = xr->lo;
     uint64_t h = xr->hi;
@@ -38,12 +37,12 @@ static inline uint64_t xNextLong(Xoroshiro *xr)
     return n;
 }
 
-static inline double xNextDouble(Xoroshiro *xr)
+inline double xNextDouble(Xoroshiro *xr)
 {
     return (xNextLong(xr) >> (64-53)) * 1.1102230246251565E-16;
 }
 
-double calculateCrunchiness(Xoroshiro state, int large, int octave)
+inline double calculateCrunchiness(Xoroshiro state, int large, int octave)
 {
     static const uint64_t md5_octave_n[][2] = {
         {0xb198de63a8012672, 0x7b84cad43ef7b5a8}, // md5 "octave_-12"
@@ -72,7 +71,7 @@ double calculateCrunchiness(Xoroshiro state, int large, int octave)
     return yOffset - floor(yOffset);
 }
 
-void initOctaveSeeds(Xoroshiro *octASeed, Xoroshiro *octBSeed, uint64_t seed, int large)
+inline void initOctaveSeeds(Xoroshiro *octASeed, Xoroshiro *octBSeed, uint64_t seed, int large)
 {
     //this gets the seeds for octaveA and octaveB
     Xoroshiro xr;
@@ -95,7 +94,15 @@ void initOctaveSeeds(Xoroshiro *octASeed, Xoroshiro *octBSeed, uint64_t seed, in
 }
 
 //calculate MAD for octaves up to n
-double calculateMAD(Xoroshiro *octaveSeed, int large, int octave) {
-    double crunchiness = calculateCrunchiness(octaveSeed, large, octave);
-    
+inline double doubleMad(Xoroshiro octaveSeedA, Xoroshiro octaveSeedB, int large) {
+    //double crunchiness = calculateCrunchiness(octaveSeed, large, octaveMax);
+
+    double sum = 0.0;
+    sum += 1 * fabs(calculateCrunchiness(octaveSeedA, large, 0) - 0.5);
+    sum += 1 * fabs(calculateCrunchiness(octaveSeedB, large, 0) - 0.5);
+    sum += 0.5 * fabs(calculateCrunchiness(octaveSeedA, large, 1) - 0.5);
+    sum += 0.5 * fabs(calculateCrunchiness(octaveSeedB, large, 1) - 0.5);
+
+    return sum / 3.0;
 }
+
