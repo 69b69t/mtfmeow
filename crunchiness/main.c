@@ -3,21 +3,21 @@
 
 #include "crunchLib.h"
 
-int main() {
-    //uint64_t seed = 2551209;
-
-    //large check
-    int large = 0;
-
+int main()
+{
     Xoroshiro octASeed, octBSeed;
-    
+    int large = 0;
+    double mad;
+    initOctaveSeeds(&octASeed, &octBSeed, -3192667955364718523ULL, large);
+    printf("%f\n", doubleMad(octASeed, octBSeed, large, 2));
+
+    return 0;
+
     for(uint64_t i = 0; i < 1000000000ULL; i++)
     {
         initOctaveSeeds(&octASeed, &octBSeed, i, large);
-
-        //double doubleMad(Xoroshiro octaveSeedA, Xoroshiro octaveSeedB, int large) {
-        double mad = doubleMad(octASeed, octBSeed, large);
-        if (mad < 0.003) printf("%ld\n", i);
+        mad = doubleMad(octASeed, octBSeed, large, 1);
+        if (mad < 0.007) printf("%ld\n", i);
     }
     return 0;
 }

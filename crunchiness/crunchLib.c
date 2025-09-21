@@ -94,15 +94,21 @@ inline void initOctaveSeeds(Xoroshiro *octASeed, Xoroshiro *octBSeed, uint64_t s
 }
 
 //calculate MAD for octaves up to n
-inline double doubleMad(Xoroshiro octaveSeedA, Xoroshiro octaveSeedB, int large) {
+inline double doubleMad(Xoroshiro octaveSeedA, Xoroshiro octaveSeedB, int large, int maxOctave) {
     //double crunchiness = calculateCrunchiness(octaveSeed, large, octaveMax);
 
+    const double weights[] = {1, 1, 2, 2, 2, 1, 1, 1, 1};
     double sum = 0.0;
-    sum += 1 * fabs(calculateCrunchiness(octaveSeedA, large, 0) - 0.5);
-    sum += 1 * fabs(calculateCrunchiness(octaveSeedB, large, 0) - 0.5);
-    sum += 0.5 * fabs(calculateCrunchiness(octaveSeedA, large, 1) - 0.5);
-    sum += 0.5 * fabs(calculateCrunchiness(octaveSeedB, large, 1) - 0.5);
+    double persist = 1.0;
+    double weightSum = 0.0;
+    for(int i = 0; i < maxOctave; i++)
+    {
+        sum += weights[i] * fabs(calculateCrunchiness(octaveSeedA, large, i) - 0.5);
+        sum += weights[i] * fabs(calculateCrunchiness(octaveSeedB, large, i) - 0.5);
+        weightSum += 2.0 * weights[i] * persist;
+        persist *= 0.5;
+        
+    }
 
-    return sum / 3.0;
+    return sum / weightSum;
 }
-

@@ -10,6 +10,6 @@ double calculateCrunchiness(Xoroshiro state, int large, int octaveNumber);
 
 void initOctaveSeeds(Xoroshiro *octASeed, Xoroshiro *octBSeed, uint64_t seed, int large);
 
-double doubleMad(Xoroshiro octaveSeedA, Xoroshiro octaveSeedB, int large);
+double doubleMad(Xoroshiro octaveSeedA, Xoroshiro octaveSeedB, int large, int octaveMax);
 
 #endif

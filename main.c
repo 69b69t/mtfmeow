@@ -178,6 +178,11 @@ void xPerlinInit(PerlinNoise *noise, Xoroshiro *xr)
         lookupHash[j] = n;
     }
 
+    for(int i = 0; i < 256; i++) {
+        printf("%d ", lookupHash[i] & 0xf);
+    }
+    printf("\n");
+
     //protect against overflow, if we happen to be indexing with something
     //bigger than a u8
     lookupHash[256] = lookupHash[0];
@@ -185,9 +190,6 @@ void xPerlinInit(PerlinNoise *noise, Xoroshiro *xr)
     //precompute integer and fractional part of the random y noise thing
     double yInt = floor(noise->yOffset);
     double yOffsetFract = noise->yOffset - yInt;
-
-    //debug
-    printf("value is %f\n", yOffsetFract);
 
     //save values
     noise->yInt = (int) yInt;
@@ -243,7 +245,6 @@ int xOctaveInit(OctaveNoise *noise, Xoroshiro *xr, PerlinNoise *octaves, int min
         //printf("before hash: %.16lx %.16lx\n", xhi, xlo);
         pxr.lo = xlo ^ md5_octave_n[12 + minimumOctave + i][0];
         pxr.hi = xhi ^ md5_octave_n[12 + minimumOctave + i][1];
-        printf("before xPerlinInit: %.16lx %.16lx\n", pxr.hi, pxr.lo);
         xPerlinInit(&octaves[i], &pxr);
         octaves[i].amplitude = amplitudes[i] * persist;
         octaves[i].lacunarity = lacuna;
@@ -272,15 +273,11 @@ int xDoublePerlinInit(DoublePerlinNoise *noise, Xoroshiro *xr,
         nb = nmax - na;
     }
 
-    printf("before xOctaveInit: %.16lx %.16lx\n", xr->hi, xr->lo);
-
     //init the first octave noise in double perlin noise. na is octave count
     n += xOctaveInit(&noise->octA, xr, octaves, minimumOctave, na);
-    printf("after xOctaveInitA: %.16lx %.16lx\n", xr->hi, xr->lo);
 
     //second octave noise
     n += xOctaveInit(&noise->octB, xr, octaves+n, minimumOctave, nb);
-    printf("after xOctaveInitB: %.16lx %.16lx\n", xr->hi, xr->lo);
 
 
     static const double amp_ini[] = { // (5 ./ 3) * len / (len + 1), len = 2..9
@@ -458,9 +455,9 @@ void genImage(uint64_t frame) {
 
 int main(int argc, char** argv)
 {
-    uint64_t seed = 2551209;
+    uint64_t seed = 5605115020223874862;
     int large = 0;
-    int octave_max = 2;
+    int octave_max = 1;
 
     Xoroshiro pxr;
     xSetSeed(&pxr, seed);
