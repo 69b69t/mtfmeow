@@ -42,6 +42,28 @@ inline double xNextDouble(Xoroshiro *xr)
     return (xNextLong(xr) >> (64-53)) * 1.1102230246251565E-16;
 }
 
+inline void initOctaveSeeds(Xoroshiro *octASeed, Xoroshiro *octBSeed, uint64_t seed, int large)
+{
+    //this gets the seeds for octaveA and octaveB
+    Xoroshiro xr;
+    xSetSeed(&xr, seed);
+
+    //shuffle to get a new state
+    uint64_t xlo = xNextLong(&xr);
+    uint64_t xhi = xNextLong(&xr);
+
+    //xor with different constants for different maps
+    // md5 "minecraft:continentalness" or "minecraft:continentalness_large"
+    xr.lo = xlo ^ (large ? 0x9a3f51a113fce8dc : 0x83886c9d0ae3a662);
+    xr.hi = xhi ^ (large ? 0xee2dbd157e5dcdad : 0xafa638a61b42e8ad);
+
+    //gets new states for both octave a and b
+    octASeed->lo = xNextLong(&xr);
+    octASeed->hi = xNextLong(&xr);
+    octBSeed->lo = xNextLong(&xr);
+    octBSeed->hi = xNextLong(&xr);
+}
+
 inline double calculateCrunchiness(Xoroshiro state, int large, int octave)
 {
     static const uint64_t md5_octave_n[][2] = {
@@ -71,32 +93,17 @@ inline double calculateCrunchiness(Xoroshiro state, int large, int octave)
     return yOffset - floor(yOffset);
 }
 
-inline void initOctaveSeeds(Xoroshiro *octASeed, Xoroshiro *octBSeed, uint64_t seed, int large)
+//INEFFICIENT. DONT USE IN HOT LOOPS
+inline double inefficientScore(uint64_t seed, int large, int maxOctave)
 {
-    //this gets the seeds for octaveA and octaveB
-    Xoroshiro xr;
-    xSetSeed(&xr, seed);
-
-    //shuffle to get a new state
-    uint64_t xlo = xNextLong(&xr);
-    uint64_t xhi = xNextLong(&xr);
-
-    //xor with different constants for different maps
-    // md5 "minecraft:continentalness" or "minecraft:continentalness_large"
-    xr.lo = xlo ^ (large ? 0x9a3f51a113fce8dc : 0x83886c9d0ae3a662);
-    xr.hi = xhi ^ (large ? 0xee2dbd157e5dcdad : 0xafa638a61b42e8ad);
-
-    //gets new states for both octave a and b
-    octASeed->lo = xNextLong(&xr);
-    octASeed->hi = xNextLong(&xr);
-    octBSeed->lo = xNextLong(&xr);
-    octBSeed->hi = xNextLong(&xr);
+    Xoroshiro octaveSeedA, octaveSeedB;
+    initOctaveSeeds(&octaveSeedA, &octaveSeedB, seed, large);
+    return doubleMad(octaveSeedA, octaveSeedB, large, maxOctave);
 }
 
 //calculate MAD for octaves up to n
-inline double doubleMad(Xoroshiro octaveSeedA, Xoroshiro octaveSeedB, int large, int maxOctave) {
-    //double crunchiness = calculateCrunchiness(octaveSeed, large, octaveMax);
-
+inline double doubleMad(Xoroshiro octaveSeedA, Xoroshiro octaveSeedB, int large, int maxOctave)
+{
     const double weights[] = {1, 1, 2, 2, 2, 1, 1, 1, 1};
     double sum = 0.0;
     double persist = 1.0;
@@ -111,4 +118,18 @@ inline double doubleMad(Xoroshiro octaveSeedA, Xoroshiro octaveSeedB, int large,
     }
 
     return sum / weightSum;
+}
+
+inline uint64_t getNextValid(uint64_t startSeed, double threshold, int large, int maxOctave)
+{
+    Xoroshiro octASeed, octBSeed;
+    uint64_t i = startSeed;
+
+    do
+    {
+        initOctaveSeeds(&octASeed, &octBSeed, i, large);
+        i++;
+    }
+    while(doubleMad(octASeed, octBSeed, large, maxOctave) > threshold);
+    return i - 1;
 }

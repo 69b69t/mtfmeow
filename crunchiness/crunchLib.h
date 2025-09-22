@@ -12,4 +12,8 @@ void initOctaveSeeds(Xoroshiro *octASeed, Xoroshiro *octBSeed, uint64_t seed, in
 
 double doubleMad(Xoroshiro octaveSeedA, Xoroshiro octaveSeedB, int large, int octaveMax);
 
+uint64_t getNextValid(uint64_t startSeed, double threshold, int large, int maxOctave);
+
+double inefficientScore(uint64_t seed, int large, int octaveMax);
+
 #endif
