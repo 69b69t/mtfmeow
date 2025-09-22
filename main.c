@@ -3,23 +3,12 @@
 #include <stdlib.h>
 #include <math.h>
 #include <string.h>
-#include "lodepng.h"
+//#include "lodepng.h"
 
 //copies the cubiomes generation of the continentalness.
 // for mushroom biome searching
 
 #define STRUCT(S) typedef struct S S; struct S
-
-enum
-{
-    NP_TEMPERATURE      = 0,
-    NP_HUMIDITY         = 1,
-    NP_CONTINENTALNESS  = 2,
-    NP_EROSION          = 3,
-    NP_SHIFT            = 4, 
-    NP_WEIRDNESS        = 5,
-    NP_MAX
-};
 
 //a single raw noisemap
 STRUCT(PerlinNoise)
@@ -151,11 +140,6 @@ void xPerlinInit(PerlinNoise *noise, Xoroshiro *xr)
     noise->yOffset = xNextDouble(xr) * 256.0;
     noise->zOffset = xNextDouble(xr) * 256.0;
 
-    //debug
-    // noise->xOffset = 0.0;
-    //noise->yOffset = 0.0;
-    // noise->zOffset = 0.0;
-
     noise->amplitude = 1.0;
     noise->lacunarity = 1.0;
 
@@ -178,11 +162,6 @@ void xPerlinInit(PerlinNoise *noise, Xoroshiro *xr)
         lookupHash[j] = n;
     }
 
-    for(int i = 0; i < 256; i++) {
-        printf("%d ", lookupHash[i] & 0xf);
-    }
-    printf("\n");
-
     //protect against overflow, if we happen to be indexing with something
     //bigger than a u8
     lookupHash[256] = lookupHash[0];
@@ -203,7 +182,6 @@ void xPerlinInit(PerlinNoise *noise, Xoroshiro *xr)
 int xOctaveInit(OctaveNoise *noise, Xoroshiro *xr, PerlinNoise *octaves, int minimumOctave, int nmax)
 {
     //this function initializes stacked octaves
-
 
     //bunch of constants that shall be xor'd with xrng state
     static const uint64_t md5_octave_n[][2] = {
@@ -240,9 +218,6 @@ int xOctaveInit(OctaveNoise *noise, Xoroshiro *xr, PerlinNoise *octaves, int min
     for (i = 0; i < 9 && i != nmax; i++)
     {
         Xoroshiro pxr;
-
-        //this counts the last 9 octaves
-        //printf("before hash: %.16lx %.16lx\n", xhi, xlo);
         pxr.lo = xlo ^ md5_octave_n[12 + minimumOctave + i][0];
         pxr.hi = xhi ^ md5_octave_n[12 + minimumOctave + i][1];
         xPerlinInit(&octaves[i], &pxr);
@@ -252,8 +227,6 @@ int xOctaveInit(OctaveNoise *noise, Xoroshiro *xr, PerlinNoise *octaves, int min
         lacuna *= 2.0;
         persist *= 0.5;
     }
-
-    //printf("after xOctaveInit: %.16lx %.16lx\n", xhi, xlo);
 
     noise->octaves = octaves;
     noise->octcnt = i;
@@ -274,6 +247,7 @@ int xDoublePerlinInit(DoublePerlinNoise *noise, Xoroshiro *xr,
     }
 
     //init the first octave noise in double perlin noise. na is octave count
+    //append octaves initalized to octaves
     n += xOctaveInit(&noise->octA, xr, octaves, minimumOctave, na);
 
     //second octave noise
@@ -288,7 +262,7 @@ int xDoublePerlinInit(DoublePerlinNoise *noise, Xoroshiro *xr,
 }
 
 static void init_climate_seed(
-    DoublePerlinNoise *dpn, PerlinNoise *oct,
+    DoublePerlinNoise *dpn, PerlinNoise *octaves,
     uint64_t xlo, uint64_t xhi, int large, int nmax
     )
 {
@@ -298,8 +272,7 @@ static void init_climate_seed(
     pxr.lo = xlo ^ (large ? 0x9a3f51a113fce8dc : 0x83886c9d0ae3a662);
     pxr.hi = xhi ^ (large ? 0xee2dbd157e5dcdad : 0xafa638a61b42e8ad);
 
-    //printf("in initClimateSeed: %.16lx %.16lx\n", pxr.hi, pxr.lo);
-    xDoublePerlinInit(dpn, &pxr, oct, large ? -11 : -9, nmax);
+    xDoublePerlinInit(dpn, &pxr, octaves, large ? -11 : -9, nmax);
 }
 
 //===========================END_INIT=====================
@@ -411,12 +384,11 @@ double sampleDoublePerlin(const DoublePerlinNoise *noise,
 
 //END_SAMPLING
 
+/*
+
 //helper function. delete if not using debug
 void encodeOneStep(const char* filename, const unsigned char* image, unsigned width, unsigned height) {
-  /*Encode the image*/
   unsigned error = lodepng_encode_file(filename, image, width, height, LCT_GREY, 8);
-
-  /*if there's an error, display it*/
   if(error) printf("error %u: %s\n", error, lodepng_error_text(error));
 }
 
@@ -452,12 +424,13 @@ void genImage(uint64_t frame) {
     }
     encodeOneStep(fileName, buffer, 1024, 1024);
 }
+*/
 
 int main(int argc, char** argv)
 {
-    uint64_t seed = 5605115020223874862;
+    uint64_t seed = 2551209;
     int large = 0;
-    int octave_max = 1;
+    int octave_max = -1;
 
     Xoroshiro pxr;
     xSetSeed(&pxr, seed);
@@ -465,7 +438,7 @@ int main(int argc, char** argv)
     uint64_t xhi = xNextLong(&pxr);
 
     DoublePerlinNoise dpn;
-    PerlinNoise octaves[2*23]; //this is all the noisemaps
+    PerlinNoise octaves[18]; //this is all the noisemaps
 
 
     init_climate_seed(&dpn, octaves, xlo, xhi, large, octave_max);
@@ -477,7 +450,7 @@ int main(int argc, char** argv)
             checksum += sampleDoublePerlin(&dpn, (double)x, (double)z);
         }
     }
-    //printf("checksum: %lf (should be -180780.088673)\n", checksum);
+    printf("checksum: %lf (should be -180780.088673)\n", checksum);
 
 
     return 0;
