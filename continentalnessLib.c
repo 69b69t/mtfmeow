@@ -264,11 +264,11 @@ double samplePerlin(const PerlinNoise *noise, double x, double z)
 }
 
 //sample stacked perlin noisemaps(one OctaveNoise)
-double sampleOctave(const OctaveNoise *noise, double x, double z)
+double sampleOctave(const OctaveNoise *noise, int octaveMax, double x, double z)
 {
     double v = 0;
     int i;
-    for (i = 0; i < noise->octcnt; i++)
+    for (i = 0; i < noise->octcnt && i < octaveMax; i++)
     {
         PerlinNoise *p = noise->octaves + i;
         double lf = p->lacunarity;
@@ -283,15 +283,20 @@ double sampleOctave(const OctaveNoise *noise, double x, double z)
 //sample together two stacked octave noisemaps to get the final continentalness
 //noisemap at a layer
 double sampleDoublePerlin(const DoublePerlinNoise *noise,
-        double x, double z)
+        int octaveMax, double x, double z)
 {
     //biomes are actually sampled at 1:4. look here if scales are being weird
     x /= 4;
     z /= 4;
     double v = 0;
 
-    v += sampleOctave(&noise->octA, x, z);
-    v += sampleOctave(&noise->octB, x*1.0181268882175227, z*1.0181268882175227);
+    //DRY this DRY that whatever
+    int na = (octaveMax + 1) >> 1;
+    int nb = octaveMax - na;
+
+    const double f = 337.0 / 331.0;
+    v += sampleOctave(&noise->octA, na, x, z);
+    v += sampleOctave(&noise->octB, nb, x*f, z*f);
 
     return v * noise->amplitude;
 }

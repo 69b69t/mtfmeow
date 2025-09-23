@@ -44,9 +44,9 @@ void init_climate_seed(DoublePerlinNoise *dpn, PerlinNoise *octaves, uint64_t se
 //sampling
 double samplePerlin(const PerlinNoise *noise, double x, double z);
 
-double sampleOctave(const OctaveNoise *noise, double x, double z);
+double sampleOctave(const OctaveNoise *noise, int octaveMax, double x, double z);
 
-double sampleDoublePerlin(const DoublePerlinNoise *noise, double x, double z);
+double sampleDoublePerlin(const DoublePerlinNoise *noise, int octaveMax, double x, double z);
 //end sampling
 
 #endif
