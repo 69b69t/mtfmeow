@@ -3,100 +3,12 @@
 #include <stdlib.h>
 #include <math.h>
 #include <string.h>
-//#include "lodepng.h"
+
+#include "xoroLib.h"
+#include "continentalnessLib.h"
 
 //copies the cubiomes generation of the continentalness.
 // for mushroom biome searching
-
-#define STRUCT(S) typedef struct S S; struct S
-
-//a single raw noisemap
-STRUCT(PerlinNoise)
-{
-    uint8_t lookupHash[256+1]; //shuffled bytes
-    uint8_t yInt; //y offset floor
-    double xOffset, yOffset, zOffset; //offsets of the current noisemap. x y and z
-    double amplitude; //amplitude of the noisemap
-    double lacunarity; //frequency of the noisemap
-    double yOffsetFract; //y offset fractional
-    double yFractSmoothstep; //precomputed noisestep of something. maybe y offset?
-};
-
-//a bunch of stacked noisemaps
-STRUCT(OctaveNoise)
-{
-    int octcnt; //number of octaves
-    PerlinNoise *octaves;
-};
-
-//two octave noisemaps that get stacked
-STRUCT(DoublePerlinNoise)
-{
-    double amplitude;
-    OctaveNoise octA;
-    OctaveNoise octB;
-};
-
-//==================RNG================
-
-STRUCT(Xoroshiro)
-{
-    uint64_t lo, hi;
-};
-
-uint64_t rotl64(uint64_t x, uint8_t b)
-{
-    return (x << b) | (x >> (64-b));
-}
-
-static inline void xSetSeed(Xoroshiro *xr, uint64_t value)
-{
-    const uint64_t XL = 0x9e3779b97f4a7c15ULL;
-    const uint64_t XH = 0x6a09e667f3bcc909ULL;
-    const uint64_t A = 0xbf58476d1ce4e5b9ULL;
-    const uint64_t B = 0x94d049bb133111ebULL;
-    uint64_t l = value ^ XH;
-    uint64_t h = l + XL;
-    l = (l ^ (l >> 30)) * A;
-    h = (h ^ (h >> 30)) * A;
-    l = (l ^ (l >> 27)) * B;
-    h = (h ^ (h >> 27)) * B;
-    l = l ^ (l >> 31);
-    h = h ^ (h >> 31);
-    xr->lo = l;
-    xr->hi = h;
-}
-
-static inline uint64_t xNextLong(Xoroshiro *xr)
-{
-    uint64_t l = xr->lo;
-    uint64_t h = xr->hi;
-    uint64_t n = rotl64(l + h, 17) + l;
-    h ^= l;
-    xr->lo = rotl64(l, 49) ^ h ^ (h << 21);
-    xr->hi = rotl64(h, 28);
-    return n;
-}
-
-static inline int xNextInt(Xoroshiro *xr, uint32_t n)
-{
-    uint64_t r = (xNextLong(xr) & 0xFFFFFFFF) * n;
-    if ((uint32_t)r < n)
-    {
-        while ((uint32_t)r < (~n + 1) % n)
-        {
-            r = (xNextLong(xr) & 0xFFFFFFFF) * n;
-        }
-    }
-    return r >> 32;
-}
-
-static inline double xNextDouble(Xoroshiro *xr)
-{
-    return (xNextLong(xr) >> (64-53)) * 1.1102230246251565E-16;
-}
-
-//=================END_RNG==================
 
 static inline double lerp(double part, double from, double to)
 {
@@ -261,7 +173,7 @@ int xDoublePerlinInit(DoublePerlinNoise *noise, Xoroshiro *xr,
     return n;
 }
 
-static void init_climate_seed(
+void init_climate_seed(
     DoublePerlinNoise *dpn, PerlinNoise *octaves,
     uint64_t xlo, uint64_t xhi, int large, int nmax
     )
@@ -279,7 +191,8 @@ static void init_climate_seed(
 
 //===========================SAMPLING==============================
 
-//sample single perlin noisemap. this is the important bit
+//sample single perlin noisemap. this takes a noisemap and x z coordinates
+//within the range 0.0 .. 256.0 on the y level 0
 double samplePerlin(const PerlinNoise *noise, double x, double z)
 {
     uint8_t xInt, yInt, zInt;
@@ -301,35 +214,28 @@ double samplePerlin(const PerlinNoise *noise, double x, double z)
     //restrict x and z to be only the fractional part. 0.0 - 1.0
     x -= xIntTemp;
     z -= zIntTemp;
-
-    //cast the integer values to 
     xInt = (int) xIntTemp;
     zInt = (int) zIntTemp;
 
-    //smoothstep function. 
+    //smoothstep function. potentially will remove
     t1 = x*x*x * (x * (x*6.0-15.0) + 10.0);
     t3 = z*z*z * (z * (z*6.0-15.0) + 10.0);
-    //t1 = x;
-    //t3 = z;
 
     const uint8_t *lookupHash = noise->lookupHash;
 
-    //get psuedorandom values from a lookup table. this uses yInt to...?
-    //seems like it would entirely modify the noise past integer boundaries?
-    //upon further inspection, it seems to randomize gradient placement
+    //get psuedorandom values from a lookup table, to "randomize"
+    //the 8 corners of the unit cube we're in
+
+    //it looks like this because its optimized
     uint8_t a1 = lookupHash[xInt]   + yInt;
     uint8_t b1 = lookupHash[xInt+1] + yInt;
 
-    //printf("a1:%.2x b1:%.2x yInt:%d\n", a1, b1, yInt);
-
-    //gets more hashes, this time for the 
     uint8_t a2 = lookupHash[a1]   + zInt;
     uint8_t b2 = lookupHash[b1]   + zInt;
     uint8_t a3 = lookupHash[a1+1] + zInt;
     uint8_t b3 = lookupHash[b1+1] + zInt;
-    //printf("a2:%.2x b2:%.2x a3:%.2x b3:%.2x \n\n", a2, b2, a3, b3);
 
-    //computes the gradients 
+    //computes the gradients, and calculate the dot products across all 8 vectors
     double l1 = indexedLerp(lookupHash[a2],   x,   yOffsetFract,   z);
     double l2 = indexedLerp(lookupHash[b2],   x-1, yOffsetFract,   z);
     double l3 = indexedLerp(lookupHash[a3],   x,   yOffsetFract-1, z);
@@ -353,7 +259,7 @@ double samplePerlin(const PerlinNoise *noise, double x, double z)
     return lerp(t3, l1, l5);
 }
 
-//sample stacked perlin noisemaps
+//sample stacked perlin noisemaps(one OctaveNoise)
 double sampleOctave(const OctaveNoise *noise, double x, double z)
 {
     double v = 0;
@@ -370,7 +276,8 @@ double sampleOctave(const OctaveNoise *noise, double x, double z)
     return v;
 }
 
-//sample two perlin noisemaps and add them together with v
+//sample together two stacked octave noisemaps to get the final continentalness
+//noisemap at a layer
 double sampleDoublePerlin(const DoublePerlinNoise *noise,
         double x, double z)
 {
@@ -383,75 +290,3 @@ double sampleDoublePerlin(const DoublePerlinNoise *noise,
 }
 
 //END_SAMPLING
-
-/*
-
-//helper function. delete if not using debug
-void encodeOneStep(const char* filename, const unsigned char* image, unsigned width, unsigned height) {
-  unsigned error = lodepng_encode_file(filename, image, width, height, LCT_GREY, 8);
-  if(error) printf("error %u: %s\n", error, lodepng_error_text(error));
-}
-
-void genImage(uint64_t frame) {
-    //test code to generate a default noisemap
-
-    double y = frame / 1024.0;
-    char* fileName;
-    asprintf(&fileName, "images/%.4ld.png", frame);
-
-    Xoroshiro xrng;
-    xSetSeed(&xrng, 1);
-
-    PerlinNoise perlinTest;
-    xPerlinInit(&perlinTest, &xrng);
-
-    //manually modify noise height
-    perlinTest.yInt = (int) floor(y);
-    perlinTest.yOffsetFract = y - floor(y);
-
-    //smooth(er)step between 0 and 1.
-    perlinTest.yFractSmoothstep = perlinTest.yOffsetFract*perlinTest.yOffsetFract*perlinTest.yOffsetFract * (perlinTest.yOffsetFract * (perlinTest.yOffsetFract*6.0-15.0) + 10.0);
-
-    unsigned char* buffer = (unsigned char*)malloc(1024 * 1024 * sizeof(unsigned char));
-    double pixel;
-    for(int x = 0; x < 1024; x++) {
-        for(int z = 0; z < 1024; z++) {
-            pixel = samplePerlin(&perlinTest, (double)x/16, (double)z/16);
-            pixel += 1;
-            pixel /= 2;
-            buffer[x*1024 + z] = (unsigned char)(256 * pixel) & 0xff;
-        }
-    }
-    encodeOneStep(fileName, buffer, 1024, 1024);
-}
-*/
-
-int main(int argc, char** argv)
-{
-    uint64_t seed = 2551209;
-    int large = 0;
-    int octave_max = -1;
-
-    Xoroshiro pxr;
-    xSetSeed(&pxr, seed);
-    uint64_t xlo = xNextLong(&pxr);
-    uint64_t xhi = xNextLong(&pxr);
-
-    DoublePerlinNoise dpn;
-    PerlinNoise octaves[18]; //this is all the noisemaps
-
-
-    init_climate_seed(&dpn, octaves, xlo, xhi, large, octave_max);
-
-    
-    double checksum = 0;
-    for(int x = 0; x < 1024; x++) {
-        for(int z = 0; z < 1024; z++) {
-            checksum += sampleDoublePerlin(&dpn, (double)x, (double)z);
-        }
-    }
-    printf("checksum: %lf (should be -180780.088673)\n", checksum);
-
-
-    return 0;
-}
