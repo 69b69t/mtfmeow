@@ -175,10 +175,14 @@ int xDoublePerlinInit(DoublePerlinNoise *noise, Xoroshiro *xr,
 
 void init_climate_seed(
     DoublePerlinNoise *dpn, PerlinNoise *octaves,
-    uint64_t xlo, uint64_t xhi, int large, int nmax
+    uint64_t seed, int large, int nmax
     )
 {
     Xoroshiro pxr;
+    xSetSeed(&pxr, seed);
+    uint64_t xlo = xNextLong(&pxr);
+    uint64_t xhi = xNextLong(&pxr);
+
 
     // md5 "minecraft:continentalness" or "minecraft:continentalness_large"
     pxr.lo = xlo ^ (large ? 0x9a3f51a113fce8dc : 0x83886c9d0ae3a662);
@@ -281,6 +285,9 @@ double sampleOctave(const OctaveNoise *noise, double x, double z)
 double sampleDoublePerlin(const DoublePerlinNoise *noise,
         double x, double z)
 {
+    //biomes are actually sampled at 1:4. look here if scales are being weird
+    x /= 4;
+    z /= 4;
     double v = 0;
 
     v += sampleOctave(&noise->octA, x, z);

@@ -38,7 +38,7 @@ int xOctaveInit(OctaveNoise *noise, Xoroshiro *xr, PerlinNoise *octaves, int min
 
 int xDoublePerlinInit(DoublePerlinNoise *noise, Xoroshiro *xr, PerlinNoise *octaves, int minimumOctave, int nmax);
 
-void init_climate_seed(DoublePerlinNoise *dpn, PerlinNoise *octaves, uint64_t xlo, uint64_t xhi, int large, int nmax);
+void init_climate_seed(DoublePerlinNoise *dpn, PerlinNoise *octaves, uint64_t seed, int large, int nmax);
 //end init
 
 //sampling
