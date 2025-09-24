@@ -12,24 +12,28 @@
 int omission0b(uint64_t seed, DoublePerlinNoise* dpn, int xOffset, int zOffset)
 {
     //this "simply" checks a see to see if it has a big shroom
-    int large = 0;
     int octave_max = 2;
     PerlinNoise octaves[18]; //this is all the noisemaps.
     //it must be 18 long as at most we have 18 perlin noisemaps
-
-
 
     //this function checks over the whole world at points designated by omissionTiling0a
     
     //this should be the first number before -30mil that is divisable by 2^19
     int mostMinimum = (-30000000 >> 19) << 19;
     
+    //search a slightly bigger area than the actual minecraft world
     for(int x = (mostMinimum + xOffset); x < 30000000; x += (1 << 19))
     {
         for(int z = (mostMinimum + zOffset); z < 30000000; z += (1 << 19))
         {
-            double sample = sampleDoublePerlin(dpn, octave_max, (double)x, (double)z);
-            if(sample < -1.4) printf("%ld %d %d %d\n", seed, (int)(10000*sample), x, z);
+            //showme7 says to only sample the triange, on an or statement
+            double sampleRight = sampleDoublePerlin(dpn, octave_max, (double)(x + 4096), (double)(z));
+            double sampleTopLeft = sampleDoublePerlin(dpn, octave_max, (double)(x - 2048), (double)(z + 3574));
+            double sampleBottomLeft = sampleDoublePerlin(dpn, octave_max, (double)(x - 2048), (double)(z - 3574));
+
+            //if one of the above is below threshold, print it
+            if(sampleRight < -0.7 && sampleTopLeft < -0.7 && sampleBottomLeft < -0.7)
+                printf("%ld %d %d\n", seed, x, z);
         }
     }
 }
@@ -37,7 +41,7 @@ int omission0b(uint64_t seed, DoublePerlinNoise* dpn, int xOffset, int zOffset)
 int omissionTiling0a(uint64_t seed)
 {
     //this "simply" checks a see to see if it has a big shroom
-    int large = 0;
+    int large = 1;
     int octave_max = 1;
     DoublePerlinNoise dpn;
     PerlinNoise octaves[18]; //this is all the noisemaps.
@@ -47,11 +51,11 @@ int omissionTiling0a(uint64_t seed)
 
     //check a single perlin tile. it would perfectly tile IF SHOWME
     //actually gave the green light on it...
-    for(int x = 0; x < (1 << 19); x += 25000) {
-        for(int z = 0; z < (1 << 19); z += 25000) {
-            double sample = sampleDoublePerlin(&dpn, 1, (double)x, (double)z);
+    for(int x = 0; x < (1 << 19); x += 32768) {
+        for(int z = 0; z < (1 << 19); z += 32768) {
+            double sample = sampleDoublePerlin(&dpn, octave_max, (double)x, (double)z);
 
-            if(sample < -0.3) omission0b(seed, &dpn, x, z);
+            if(sample < -0.275) omission0b(seed, &dpn, x, z);
         }
     }
 
@@ -61,7 +65,7 @@ int omissionTiling0a(uint64_t seed)
 
 int main(int argc, char** argv)
 {
-    for(uint64_t i = 2551209; ; i++)
+    for(uint64_t i = 0; ; i++)
     {
         omissionTiling0a(i);
     }
