@@ -1,14 +1,10 @@
-#include <stdio.h>
 #include <stdint.h>
-#include <stdlib.h>
 #include <math.h>
-#include <string.h>
 
-#include "xoroLib.h"
 #include "continentalnessLib.h"
 
 //copies the cubiomes generation of the continentalness.
-// for mushroom biome searching
+//for mushroom biome searching
 
 static inline double lerp(double part, double from, double to)
 {
