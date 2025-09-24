@@ -10,14 +10,14 @@
 
 int omission0b(uint64_t seed, DoublePerlinNoise* dpn, int xOffset, int zOffset)
 {
-    //this "simply" checks a see to see if it has a big shroom
     int octave_max = 2;
 
     //this function checks over the whole world at points designated by omissionTiling0a
-    
+
     //this should be the first number before -30mil that is divisable by 2^19
-    int mostMinimum = (-30000000 >> 19) << 19;
-    
+    int period = 1<<19;
+    int mostMinimum = (-30000000 / period) * period;
+
     //search a slightly bigger area than the actual minecraft world
     for(int x = (mostMinimum + xOffset); x < 30000000; x += (1 << 19))
     {
@@ -30,7 +30,7 @@ int omission0b(uint64_t seed, DoublePerlinNoise* dpn, int xOffset, int zOffset)
             double sampleBottomLeft = sampleDoublePerlin(dpn, octave_max, (double)(x - 2048), (double)(z - 3574));
 
             //if one of the above is below threshold, print it
-            if(sampleRight < -0.7 && sampleTopLeft < -0.7 && sampleBottomLeft < -0.7)
+            if(sampleRight < -0.4 && sampleTopLeft < -0.4 && sampleBottomLeft < -0.4)
                 printf("%ld %d %d\n", seed, x, z);
         }
     }
@@ -71,6 +71,6 @@ int main(int argc, char** argv)
     {
         omissionTiling0a(i);
     }
-    
+
     return 0;
 }
