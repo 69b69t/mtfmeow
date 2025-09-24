@@ -30,7 +30,7 @@ int omission0b(uint64_t seed, DoublePerlinNoise* dpn, int xOffset, int zOffset)
             double sampleBottomLeft = sampleDoublePerlin(dpn, octave_max, (double)(x - 2048), (double)(z - 3574));
 
             //if one of the above is below threshold, print it
-            if(sampleRight < -0.4 && sampleTopLeft < -0.4 && sampleBottomLeft < -0.4)
+            if(sampleRight < -0.4 || sampleTopLeft < -0.4 || sampleBottomLeft < -0.4)
                 printf("%ld %d %d\n", seed, x, z);
         }
     }
