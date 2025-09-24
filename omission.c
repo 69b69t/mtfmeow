@@ -12,8 +12,6 @@ int omission0b(uint64_t seed, DoublePerlinNoise* dpn, int xOffset, int zOffset)
 {
     //this "simply" checks a see to see if it has a big shroom
     int octave_max = 2;
-    PerlinNoise octaves[18]; //this is all the noisemaps.
-    //it must be 18 long as at most we have 18 perlin noisemaps
 
     //this function checks over the whole world at points designated by omissionTiling0a
     
@@ -26,6 +24,7 @@ int omission0b(uint64_t seed, DoublePerlinNoise* dpn, int xOffset, int zOffset)
         for(int z = (mostMinimum + zOffset); z < 30000000; z += (1 << 19))
         {
             //showme7 says to only sample the triange, on an or statement
+            //this can be sped up a bit if we stop on first failure
             double sampleRight = sampleDoublePerlin(dpn, octave_max, (double)(x + 4096), (double)(z));
             double sampleTopLeft = sampleDoublePerlin(dpn, octave_max, (double)(x - 2048), (double)(z + 3574));
             double sampleBottomLeft = sampleDoublePerlin(dpn, octave_max, (double)(x - 2048), (double)(z - 3574));
@@ -35,6 +34,9 @@ int omission0b(uint64_t seed, DoublePerlinNoise* dpn, int xOffset, int zOffset)
                 printf("%ld %d %d\n", seed, x, z);
         }
     }
+
+    //change to return something else
+    return 0;
 }
 
 int omissionTiling0a(uint64_t seed)
@@ -46,6 +48,7 @@ int omissionTiling0a(uint64_t seed)
     PerlinNoise octaves[18]; //this is all the noisemaps.
     //it must be 18 long as at most we have 18 perlin noisemaps
 
+    //init all 
     init_climate_seed(&dpn, octaves, seed, large, -1);
 
     //check a single perlin tile. it would perfectly tile IF SHOWME
