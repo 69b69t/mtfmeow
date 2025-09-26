@@ -39,15 +39,19 @@ int biomeSamples(DoublePerlinNoise* dpn, int octaveMax, Pos2d position,
     else return 0;
 }
 
-int omission0b(uint64_t seed, DoublePerlinNoise* dpn, Pos2d position)
+int omission0b(DoublePerlinNoise* dpn, Pos2d* positions,
+    int positionCount, Pos2d* buffer)
 {
+    //triangle check
     int octaveMax = 2;
 
-    //this function checks over the whole world at points designated by omissionTiling0a
-
-    //this should be the first number before -30mil that is divisable by 2^19
+    //this should be the first number before -30mil
+    //that is divisable by 2^19
     int period = 1<<19;
     int mostMinimum = (-30000000 / period) * period;
+
+    int bufferLength = 0;
+    Pos2d temp;
 
     //search a slightly bigger area than the actual minecraft world
     for(int x = (mostMinimum + position.xPos); x < 30000000; x += (1 << 19))
@@ -63,9 +67,13 @@ int omission0b(uint64_t seed, DoublePerlinNoise* dpn, Pos2d position)
                 (double)(x - 2048), (double)(z - 3574));
 
             //if one of the above is below threshold, print it
-            if(sampleRight < -0.4 || sampleTopLeft < -0.4 || sampleBottomLeft < -0.4) {
-                printf("%ld %d %d\n", seed, x, z);
-                //fflush(stdout);
+            if(sampleRight < -0.4 ||
+                sampleTopLeft < -0.4 ||
+                sampleBottomLeft < -0.4)
+            {
+                temp.xPos = x;
+                temp.zPos = z;
+                buffer[bufferLength] = temp;
             }
         }
     }
@@ -104,16 +112,15 @@ int main(int argc, char** argv)
 {
     //this "simply" checks a see to see if it has a big shroom
     int large = 1;
-    int octave_max = 1;
     DoublePerlinNoise dpn;
     PerlinNoise octaves[18]; //this is all the noisemaps.
     //it must be 18 long as at most we have 18 perlin noisemaps
+
+
     init_climate_seed(&dpn, octaves, 694201337, large, -1);
-
-
     Pos2d *buffer0a = (Pos2d*)malloc(1000000 * sizeof(Pos2d));
+    int count0b = omissionTiling0a(&dpn, buffer0a);
 
-    int count = omissionTiling0a(&dpn, buffer0a);
 
     printf("%d\n", count);
 
