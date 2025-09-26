@@ -9,16 +9,28 @@
 //thats really my only gripe with c. apart from the stack smashing thing
 
 double biomeSamples(DoublePerlinNoise* dpn, int xOffset, int zOffset,
-    int size, int density, double threshold)
+    int size, int density, double threshold, int octaveMax)
 {
     //x and z offset is the center of the size x size square
     //sampling is done at 1:density scale
     //count points under threshold
-    for(int x = )
+    int radius = size >> 1;
+    int count = 0;
+    for(int x = -radius; x < radius; x += density)
+    {
+        for(int z = -radius; z < radius; z += density)
+        {
+            double sample = sampleDoublePerlin(dpn, octaveMax, (double)(xOffset + x), (double)(zOffset + z));
+            if(sample < threshold) count++;
+        }
+    }
+
+    return (double)count / (((double)size / density)*((double)size / density));
+}
 
 int omission0b(uint64_t seed, DoublePerlinNoise* dpn, int xOffset, int zOffset)
 {
-    int octave_max = 2;
+    int octaveMax = 2;
 
     //this function checks over the whole world at points designated by omissionTiling0a
 
@@ -33,9 +45,9 @@ int omission0b(uint64_t seed, DoublePerlinNoise* dpn, int xOffset, int zOffset)
         {
             //showme7 says to only sample the triange, on an or statement
             //this can be sped up a bit if we stop on first failure
-            double sampleRight = sampleDoublePerlin(dpn, octave_max, (double)(x + 4096), (double)(z));
-            double sampleTopLeft = sampleDoublePerlin(dpn, octave_max, (double)(x - 2048), (double)(z + 3574));
-            double sampleBottomLeft = sampleDoublePerlin(dpn, octave_max, (double)(x - 2048), (double)(z - 3574));
+            double sampleRight = sampleDoublePerlin(dpn, octaveMax, (double)(x + 4096), (double)(z));
+            double sampleTopLeft = sampleDoublePerlin(dpn, octaveMax, (double)(x - 2048), (double)(z + 3574));
+            double sampleBottomLeft = sampleDoublePerlin(dpn, octaveMax, (double)(x - 2048), (double)(z - 3574));
 
             //if one of the above is below threshold, print it
             if(sampleRight < -0.4 || sampleTopLeft < -0.4 || sampleBottomLeft < -0.4) {
