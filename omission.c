@@ -1,6 +1,6 @@
 #include <stdio.h>
 #include <stdint.h>
-
+#include <stdlib.h>
 #include "continentalnessLib.h"
 
 //this file will have filters in it which correspond to COMISSION 5.3
@@ -14,10 +14,12 @@ typedef struct
     int zPos;
 } Pos2d;
 
-double biomeSamples(DoublePerlinNoise* dpn, int xOffset, int zOffset,
-    int size, int density, double threshold, int countThreshold, int octaveMax)
+//helper function. this returns a boolean.
+//it takes a noisemap, max octave, position, and width
+//it also takes density, threshold, and countThreshold.
+int biomeSamples(DoublePerlinNoise* dpn, int octaveMax, Pos2d position,
+    int size, int density, double threshold, int countThreshold)
 {
-    //x and z offset is the center of the size x size square
     //sampling is done at 1:density scale
     //count points under threshold
     int radius = size >> 1;
@@ -26,17 +28,18 @@ double biomeSamples(DoublePerlinNoise* dpn, int xOffset, int zOffset,
     {
         for(int z = -radius; z < radius; z += density)
         {
-            double sample = sampleDoublePerlin(dpn, octaveMax, (double)(xOffset + x), (double)(zOffset + z));
+            double sample = sampleDoublePerlin(dpn, octaveMax,
+                (double)(position.xPos + x), (double)(position.zPos + z));
             if(sample < threshold) count++;
         }
     }
 
-    //if we have enough points to pass threshold, write average and return 1
+    //if we have enough points to pass threshold, return 1
     if(count >= countThreshold) return 1;
     else return 0;
 }
 
-int omission0b(uint64_t seed, DoublePerlinNoise* dpn, int xOffset, int zOffset)
+int omission0b(uint64_t seed, DoublePerlinNoise* dpn, Pos2d position)
 {
     int octaveMax = 2;
 
@@ -47,15 +50,17 @@ int omission0b(uint64_t seed, DoublePerlinNoise* dpn, int xOffset, int zOffset)
     int mostMinimum = (-30000000 / period) * period;
 
     //search a slightly bigger area than the actual minecraft world
-    for(int x = (mostMinimum + xOffset); x < 30000000; x += (1 << 19))
+    for(int x = (mostMinimum + position.xPos); x < 30000000; x += (1 << 19))
     {
-        for(int z = (mostMinimum + zOffset); z < 30000000; z += (1 << 19))
+        for(int z = (mostMinimum + position.zPos); z < 30000000; z += (1 << 19))
         {
-            //showme7 says to only sample the triange, on an or statement
-            //this can be sped up a bit if we stop on first failure
-            double sampleRight = sampleDoublePerlin(dpn, octaveMax, (double)(x + 4096), (double)(z));
-            double sampleTopLeft = sampleDoublePerlin(dpn, octaveMax, (double)(x - 2048), (double)(z + 3574));
-            double sampleBottomLeft = sampleDoublePerlin(dpn, octaveMax, (double)(x - 2048), (double)(z - 3574));
+            //sampling a triangle
+            double sampleRight = sampleDoublePerlin(dpn, octaveMax,
+                (double)(x + 4096), (double)(z));
+            double sampleTopLeft = sampleDoublePerlin(dpn, octaveMax,
+                (double)(x - 2048), (double)(z + 3574));
+            double sampleBottomLeft = sampleDoublePerlin(dpn, octaveMax,
+                (double)(x - 2048), (double)(z - 3574));
 
             //if one of the above is below threshold, print it
             if(sampleRight < -0.4 || sampleTopLeft < -0.4 || sampleBottomLeft < -0.4) {
@@ -69,7 +74,33 @@ int omission0b(uint64_t seed, DoublePerlinNoise* dpn, int xOffset, int zOffset)
     return 0;
 }
 
-int omissionTiling0a(uint64_t seed)
+int omissionTiling0a(DoublePerlinNoise* dpn, Pos2d* buffer)
+{
+    Pos2d temp;
+
+    int octaveMax = 1;
+    //this will segfault if we ever have more than a million points
+    //in that case just increase the limit
+    int bufferLength = 0;
+
+    for(int x = 0; x < (1 << 19); x += 32768) {
+        for(int z = 0; z < (1 << 19); z += 32768) {
+            double sample = sampleDoublePerlin(dpn, octaveMax, (double)x, (double)z);
+
+            if(sample < -0.275)
+            {
+                temp.xPos = x;
+                temp.zPos = z;
+                buffer[bufferLength] = temp;
+                bufferLength++;
+            }
+        }
+    }
+
+    return bufferLength;
+}
+
+int main(int argc, char** argv)
 {
     //this "simply" checks a see to see if it has a big shroom
     int large = 1;
@@ -77,30 +108,14 @@ int omissionTiling0a(uint64_t seed)
     DoublePerlinNoise dpn;
     PerlinNoise octaves[18]; //this is all the noisemaps.
     //it must be 18 long as at most we have 18 perlin noisemaps
+    init_climate_seed(&dpn, octaves, 694201337, large, -1);
 
-    //init all 
-    init_climate_seed(&dpn, octaves, seed, large, -1);
 
-    //check a single perlin tile. it would perfectly tile IF SHOWME
-    //actually gave the green light on it...
-    for(int x = 0; x < (1 << 19); x += 32768) {
-        for(int z = 0; z < (1 << 19); z += 32768) {
-            double sample = sampleDoublePerlin(&dpn, octave_max, (double)x, (double)z);
+    Pos2d *buffer0a = (Pos2d*)malloc(1000000 * sizeof(Pos2d));
 
-            if(sample < -0.275) omission0b(seed, &dpn, x, z);
-        }
-    }
+    int count = omissionTiling0a(&dpn, buffer0a);
 
-    //automatically false for now
-    return 0;
-}
-
-int main(int argc, char** argv)
-{
-    for(uint64_t i = 0; ; i++)
-    {
-        omissionTiling0a(i);
-    }
+    printf("%d\n", count);
 
     return 0;
 }
