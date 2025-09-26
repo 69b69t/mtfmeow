@@ -8,8 +8,14 @@
 //dont exactly have vectors to use
 //thats really my only gripe with c. apart from the stack smashing thing
 
+typedef struct
+{
+    int xPos;
+    int zPos;
+} Pos2d;
+
 double biomeSamples(DoublePerlinNoise* dpn, int xOffset, int zOffset,
-    int size, int density, double threshold, int octaveMax)
+    int size, int density, double threshold, int countThreshold, int octaveMax)
 {
     //x and z offset is the center of the size x size square
     //sampling is done at 1:density scale
@@ -25,7 +31,9 @@ double biomeSamples(DoublePerlinNoise* dpn, int xOffset, int zOffset,
         }
     }
 
-    return (double)count / (((double)size / density)*((double)size / density));
+    //if we have enough points to pass threshold, write average and return 1
+    if(count >= countThreshold) return 1;
+    else return 0;
 }
 
 int omission0b(uint64_t seed, DoublePerlinNoise* dpn, int xOffset, int zOffset)
