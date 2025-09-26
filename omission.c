@@ -8,6 +8,14 @@
 //dont exactly have vectors to use
 //thats really my only gripe with c. apart from the stack smashing thing
 
+double biomeSamples(DoublePerlinNoise* dpn, int xOffset, int zOffset,
+    int size, int density, double threshold)
+{
+    //x and z offset is the center of the size x size square
+    //sampling is done at 1:density scale
+    //count points under threshold
+    for(int x = )
+
 int omission0b(uint64_t seed, DoublePerlinNoise* dpn, int xOffset, int zOffset)
 {
     int octave_max = 2;
@@ -32,7 +40,7 @@ int omission0b(uint64_t seed, DoublePerlinNoise* dpn, int xOffset, int zOffset)
             //if one of the above is below threshold, print it
             if(sampleRight < -0.4 || sampleTopLeft < -0.4 || sampleBottomLeft < -0.4) {
                 printf("%ld %d %d\n", seed, x, z);
-                fflush(stdout);
+                //fflush(stdout);
             }
         }
     }
