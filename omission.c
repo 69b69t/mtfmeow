@@ -32,8 +32,8 @@ int biomeSamples(DoublePerlinNoise* dpn, int octaveMax, //noise based things
         int count = 0;
 
         //averaging stuff to put the center point into buffer
-        int xSum = 0;
-        int zSum = 0;
+        int64_t xSum = 0;
+        int64_t zSum = 0;
         for(int x = -radius; x+density < radius; x += density)
         {
             for(int z = -radius; z+density < radius; z += density)
@@ -45,10 +45,10 @@ int biomeSamples(DoublePerlinNoise* dpn, int octaveMax, //noise based things
                 {
                     //increase the count of samples at this position that passed the check
                     //then add the x and z components to a running sum for averaging
-                    xSum += positions[i].xPos;
-                    zSum += positions[i].zPos;
+                    //printf("%d\n", (positions[i].zPos + z));
+                    xSum += (positions[i].xPos + x);
+                    zSum += (positions[i].zPos + z);
                     count++;
-                    
                 }
             }
         }
@@ -56,8 +56,11 @@ int biomeSamples(DoublePerlinNoise* dpn, int octaveMax, //noise based things
         //after the check do stuff with the buffer to store it
         if(count >= countThreshold)
         {
-            temp.xPos = xSum / count;
-            temp.zPos = zSum / count;
+            
+            temp.xPos = (int)(xSum / count);
+            temp.zPos = (int)(zSum / count);
+            //printf("%ld/%d = %d and %ld/%d = %d\n", xSum, count, temp.xPos, zSum, count, temp.zPos);
+            //printf("average %d %d\n", positions[i].xPos, positions[i].zPos);
             buffer[bufferLength] = temp;
             bufferLength++;
         }
@@ -152,7 +155,7 @@ int main(int argc, char** argv)
     Pos2d *bufferSamplesFull0 = (Pos2d*)malloc(1000000 * sizeof(Pos2d));
     Pos2d *bufferSamplesFull1 = (Pos2d*)malloc(1000000 * sizeof(Pos2d));
 
-    for(uint64_t i = 0ULL; i < 1000ULL; i++)
+    for(uint64_t i = 0ULL; i < 1000000ULL; i++)
     {
         //climate init
         init_climate_seed(&dpn, octaves, i, large, -1);
@@ -166,16 +169,24 @@ int main(int argc, char** argv)
         int countSamplesFull0 = biomeSamples(&dpn, 18, 32768, 2048, -1.05, 9, bufferSamples0b2, countSamples0b2, bufferSamplesFull0);
         int countSamplesFull1 = biomeSamples(&dpn, 18, 32768, 364, -1.05, 530, bufferSamplesFull0, countSamplesFull0, bufferSamplesFull1);
 
+        /*
         if(countSamplesFull0 > 0)
         {
             printf("seed:%ld (%d -> %d) -> (%d -> %d -> %d) -> (%d -> %d)\n", i, count0a, count0b, countSamples0b0,
             countSamples0b1, countSamples0b2, countSamplesFull0, countSamplesFull1);
             printf("%ld %d %d\n", i, bufferSamplesFull0[0].xPos, bufferSamplesFull0[0].zPos);
         }
+        */
+
         if(countSamplesFull1 > 0)
         {
-            printf("====================%ld %d %d====================\n", i, bufferSamplesFull1[0].xPos, bufferSamplesFull1[0].zPos);
+            printf("%ld %d %d", i, bufferSamplesFull1[0].xPos, bufferSamplesFull1[0].zPos);
         }
+        else
+        {
+            printf(".");
+        }
+        fflush(stdout);
     }
     return 0;
 }
