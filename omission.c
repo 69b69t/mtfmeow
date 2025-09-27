@@ -4,6 +4,7 @@
 #include <pthread.h>
 
 #include "continentalnessLib.h"
+#include "crunchLib.h"
 
 //this file will have filters in it which correspond to COMISSION 5.3
 //the filters will be "semi-recursive", which is not how i would wish to do it, but we
@@ -166,6 +167,7 @@ void* spawnThread(void* arg)
 
     for(uint64_t i = args->threadId; i < 1000000ULL; i += args->threadCount)
     {
+        if(inefficientScore(i, large, 1) > 0.007) continue;
         //climate init
         init_climate_seed(&dpn, octaves, i, large, -1);
 

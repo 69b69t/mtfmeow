@@ -1,10 +1,7 @@
 #ifndef CRUNCHLIB_H
 #define CRUNCHLIB_H
 
-typedef struct
-{
-    uint64_t lo, hi;
-} Xoroshiro;
+#include "xoroLib.h"
 
 double calculateCrunchiness(Xoroshiro state, int large, int octaveNumber);
 
