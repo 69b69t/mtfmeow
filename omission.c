@@ -143,9 +143,6 @@ int main(int argc, char** argv)
     PerlinNoise octaves[18]; //this is all the noisemaps.
     //it must be 18 long as at most we have 18 perlin noisemaps
 
-
-    init_climate_seed(&dpn, octaves, 694201337, large, -1);
-
     //buffers
     Pos2d *buffer0a = (Pos2d*)malloc(1000000 * sizeof(Pos2d));
     Pos2d *buffer0b = (Pos2d*)malloc(1000000 * sizeof(Pos2d));
@@ -155,18 +152,26 @@ int main(int argc, char** argv)
     Pos2d *bufferSamplesFull0 = (Pos2d*)malloc(1000000 * sizeof(Pos2d));
     Pos2d *bufferSamplesFull1 = (Pos2d*)malloc(1000000 * sizeof(Pos2d));
 
-    //calculating
-    int count0a = omission0Tiling0a(&dpn, buffer0a);
-    int count0b = omission1Triangle0b(&dpn, buffer0a, count0a, buffer0b);
-    int countSamples0b0 = biomeSamples(&dpn, 2, 32768, 6553, -0.74, 1, buffer0b, count0b, bufferSamples0b0);
-    int countSamples0b1 = biomeSamples(&dpn, 2, 32768, 2978, -0.74, 9, bufferSamples0b0, countSamples0b0, bufferSamples0b1);
-    int countSamples0b2 = biomeSamples(&dpn, 2, 32768, 1424, -0.74, 38, bufferSamples0b1, countSamples0b1, bufferSamples0b2);
-    int countSamplesFull0 = biomeSamples(&dpn, 18, 32768, 2048, -1.05, 9, bufferSamples0b2, countSamples0b2, bufferSamplesFull0);
-    int countSamplesFull1 = biomeSamples(&dpn, 18, 32768, 364, -1.05, 530, bufferSamplesFull0, countSamplesFull0, bufferSamplesFull1);
+    for(uint64_t i = 0ULL; i < 1000ULL; i++)
+    {
+        //climate init
+        init_climate_seed(&dpn, octaves, i, large, -1);
 
-    printf("(%d -> %d) -> (%d -> %d -> %d) -> (%d -> %d)\n", count0a, count0b, countSamples0b0,
-        countSamples0b1, countSamples0b2, countSamplesFull0, countSamplesFull1);
-    printf("%d %d\n", bufferSamples0b2[0].xPos, bufferSamples0b2[0].zPos);
+        //calculating
+        int count0a = omission0Tiling0a(&dpn, buffer0a);
+        int count0b = omission1Triangle0b(&dpn, buffer0a, count0a, buffer0b);
+        int countSamples0b0 = biomeSamples(&dpn, 2, 32768, 6553, -0.74, 1, buffer0b, count0b, bufferSamples0b0);
+        int countSamples0b1 = biomeSamples(&dpn, 2, 32768, 2978, -0.74, 9, bufferSamples0b0, countSamples0b0, bufferSamples0b1);
+        int countSamples0b2 = biomeSamples(&dpn, 2, 32768, 1424, -0.74, 38, bufferSamples0b1, countSamples0b1, bufferSamples0b2);
+        int countSamplesFull0 = biomeSamples(&dpn, 18, 32768, 2048, -1.05, 9, bufferSamples0b2, countSamples0b2, bufferSamplesFull0);
+        int countSamplesFull1 = biomeSamples(&dpn, 18, 32768, 364, -1.05, 530, bufferSamplesFull0, countSamplesFull0, bufferSamplesFull1);
 
+        if(countSamplesFull1 > 0)
+        {
+            printf("(%d -> %d) -> (%d -> %d -> %d) -> (%d -> %d)\n", count0a, count0b, countSamples0b0,
+            countSamples0b1, countSamples0b2, countSamplesFull0, countSamplesFull1);
+            printf("%d %d\n", bufferSamplesFull1[0].xPos, bufferSamplesFull1[0].zPos);
+        }
+    }
     return 0;
 }
