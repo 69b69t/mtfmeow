@@ -166,11 +166,15 @@ int main(int argc, char** argv)
         int countSamplesFull0 = biomeSamples(&dpn, 18, 32768, 2048, -1.05, 9, bufferSamples0b2, countSamples0b2, bufferSamplesFull0);
         int countSamplesFull1 = biomeSamples(&dpn, 18, 32768, 364, -1.05, 530, bufferSamplesFull0, countSamplesFull0, bufferSamplesFull1);
 
-        if(countSamplesFull1 > 0)
+        if(countSamplesFull0 > 0)
         {
             printf("seed:%ld (%d -> %d) -> (%d -> %d -> %d) -> (%d -> %d)\n", i, count0a, count0b, countSamples0b0,
             countSamples0b1, countSamples0b2, countSamplesFull0, countSamplesFull1);
-            printf("%ld %d %d\n", i, bufferSamplesFull1[0].xPos, bufferSamplesFull1[0].zPos);
+            printf("%ld %d %d\n", i, bufferSamplesFull0[0].xPos, bufferSamplesFull0[0].zPos);
+        }
+        if(countSamplesFull1 > 0)
+        {
+            printf("====================%ld %d %d====================\n", i, bufferSamplesFull1[0].xPos, bufferSamplesFull1[0].zPos);
         }
     }
     return 0;
