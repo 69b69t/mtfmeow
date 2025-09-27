@@ -168,9 +168,9 @@ int main(int argc, char** argv)
 
         if(countSamplesFull1 > 0)
         {
-            printf("(%d -> %d) -> (%d -> %d -> %d) -> (%d -> %d)\n", count0a, count0b, countSamples0b0,
+            printf("seed:%ld (%d -> %d) -> (%d -> %d -> %d) -> (%d -> %d)\n", i, count0a, count0b, countSamples0b0,
             countSamples0b1, countSamples0b2, countSamplesFull0, countSamplesFull1);
-            printf("%d %d\n", bufferSamplesFull1[0].xPos, bufferSamplesFull1[0].zPos);
+            printf("%ld %d %d\n", i, bufferSamplesFull1[0].xPos, bufferSamplesFull1[0].zPos);
         }
     }
     return 0;
