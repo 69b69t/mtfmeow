@@ -13,26 +13,26 @@ static inline double lerp(double part, double from, double to)
 
 static inline double indexedLerp(uint8_t idx, double a, double b, double c)
 {
-   switch (idx & 0xf)
-   {
-   case 0:  return  a + b;
-   case 1:  return -a + b;
-   case 2:  return  a - b;
-   case 3:  return -a - b;
-   case 4:  return  a + c;
-   case 5:  return -a + c;
-   case 6:  return  a - c;
-   case 7:  return -a - c;
-   case 8:  return  b + c;
-   case 9:  return -b + c;
-   case 10: return  b - c;
-   case 11: return -b - c;
-   case 12: return  a + b;
-   case 13: return -b + c;
-   case 14: return -a + b;
-   case 15: return -b - c;
-   }
-   return 0;
+    switch (idx & 0xf)
+    {
+        case 0:  return  a + b;
+        case 1:  return -a + b;
+        case 2:  return  a - b;
+        case 3:  return -a - b;
+        case 4:  return  a + c;
+        case 5:  return -a + c;
+        case 6:  return  a - c;
+        case 7:  return -a - c;
+        case 8:  return  b + c;
+        case 9:  return -b + c;
+        case 10: return  b - c;
+        case 11: return -b - c;
+        case 12: return  a + b;
+        case 13: return -b + c;
+        case 14: return -a + b;
+        case 15: return -b - c;
+    }
+    return 0;
 }
 
 //===================START_INIT=================
