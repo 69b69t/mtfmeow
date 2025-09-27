@@ -1,0 +1,8 @@
+notes for cuda branch
+
+i want to have the program be split between gpu compute and cpu to make it
+easier on both. obviously some of the checks are difficult to perform
+on the gpu, like the full octave checks at 1:~300 scale
+but some other things are quite easy to do on the gpu, like crunchifier.
+i want to have a good balance between the two. 
+well. testing is in order. goodnight for now
