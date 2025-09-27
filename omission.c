@@ -147,13 +147,13 @@ int main(int argc, char** argv)
     //it must be 18 long as at most we have 18 perlin noisemaps
 
     //buffers
-    Pos2d *buffer0a = (Pos2d*)malloc(1000000 * sizeof(Pos2d));
-    Pos2d *buffer0b = (Pos2d*)malloc(1000000 * sizeof(Pos2d));
-    Pos2d *bufferSamples0b0 = (Pos2d*)malloc(1000000 * sizeof(Pos2d));
-    Pos2d *bufferSamples0b1 = (Pos2d*)malloc(1000000 * sizeof(Pos2d));
-    Pos2d *bufferSamples0b2 = (Pos2d*)malloc(1000000 * sizeof(Pos2d));
-    Pos2d *bufferSamplesFull0 = (Pos2d*)malloc(1000000 * sizeof(Pos2d));
-    Pos2d *bufferSamplesFull1 = (Pos2d*)malloc(1000000 * sizeof(Pos2d));
+    Pos2d buffer0a[256];
+    Pos2d buffer0b[500000];
+    Pos2d bufferSamples0b0[100000];
+    Pos2d bufferSamples0b1[2000];
+    Pos2d bufferSamples0b2[2000];
+    Pos2d bufferSamplesFull0[2000];
+    Pos2d bufferSamplesFull1[2000];
 
     for(uint64_t i = 0ULL; i < 1000000ULL; i++)
     {
@@ -168,15 +168,7 @@ int main(int argc, char** argv)
         int countSamples0b2 = biomeSamples(&dpn, 2, 32768, 1424, -0.74, 38, bufferSamples0b1, countSamples0b1, bufferSamples0b2);
         int countSamplesFull0 = biomeSamples(&dpn, 18, 32768, 2048, -1.05, 9, bufferSamples0b2, countSamples0b2, bufferSamplesFull0);
         int countSamplesFull1 = biomeSamples(&dpn, 18, 32768, 364, -1.05, 530, bufferSamplesFull0, countSamplesFull0, bufferSamplesFull1);
-
-        /*
-        if(countSamplesFull0 > 0)
-        {
-            printf("seed:%ld (%d -> %d) -> (%d -> %d -> %d) -> (%d -> %d)\n", i, count0a, count0b, countSamples0b0,
-            countSamples0b1, countSamples0b2, countSamplesFull0, countSamplesFull1);
-            printf("%ld %d %d\n", i, bufferSamplesFull0[0].xPos, bufferSamplesFull0[0].zPos);
-        }
-        */
+        printf("bufferSamples0b2 is %d long\n", countSamples0b2);
 
         if(countSamplesFull1 > 0)
         {
