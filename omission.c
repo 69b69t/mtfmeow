@@ -1,6 +1,8 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
+#include <pthread.h>
+
 #include "continentalnessLib.h"
 
 //this file will have filters in it which correspond to COMISSION 5.3
@@ -138,8 +140,15 @@ int omission0Tiling0a(DoublePerlinNoise* dpn, Pos2d* buffer)
     return bufferLength;
 }
 
-int main(int argc, char** argv)
+void* spawnThread(void* arg)
 {
+
+    struct
+    {
+        int threadId;
+        int threadCount;
+    } *args = arg;
+
     //this "simply" checks a see to see if it has a big shroom
     int large = 1;
     DoublePerlinNoise dpn;
@@ -155,7 +164,7 @@ int main(int argc, char** argv)
     Pos2d bufferSamplesFull0[2000];
     Pos2d bufferSamplesFull1[2000];
 
-    for(uint64_t i = 0ULL; i < 1000000ULL; i++)
+    for(uint64_t i = args->threadId; i < 1000000ULL; i += args->threadCount)
     {
         //climate init
         init_climate_seed(&dpn, octaves, i, large, -1);
@@ -168,11 +177,11 @@ int main(int argc, char** argv)
         int countSamples0b2 = biomeSamples(&dpn, 2, 32768, 1424, -0.74, 38, bufferSamples0b1, countSamples0b1, bufferSamples0b2);
         int countSamplesFull0 = biomeSamples(&dpn, 18, 32768, 2048, -1.05, 9, bufferSamples0b2, countSamples0b2, bufferSamplesFull0);
         int countSamplesFull1 = biomeSamples(&dpn, 18, 32768, 364, -1.05, 530, bufferSamplesFull0, countSamplesFull0, bufferSamplesFull1);
-        printf("bufferSamples0b2 is %d long\n", countSamples0b2);
+        //printf("bufferSamples0b2 is %d long\n", countSamples0b2);
 
         if(countSamplesFull1 > 0)
         {
-            printf("%ld %d %d", i, bufferSamplesFull1[0].xPos, bufferSamplesFull1[0].zPos);
+            printf("\n%ld %d %d\n", i, bufferSamplesFull1[0].xPos, bufferSamplesFull1[0].zPos);
         }
         else
         {
@@ -180,5 +189,34 @@ int main(int argc, char** argv)
         }
         fflush(stdout);
     }
-    return 0;
+
+    return NULL;
+}
+
+int main(int argc, char** argv)
+{
+    const int NUM_THREADS = 24;
+    pthread_t threads[NUM_THREADS];
+
+    //create threadArgs
+    struct
+    {
+        int threadId;
+        int threadCount;
+    } threadArgs[NUM_THREADS];
+
+    //define threadArgs and create threads on the fly
+    for(int i = 0; i < NUM_THREADS; i++)
+    {
+        threadArgs[i].threadId = i;
+        threadArgs[i].threadCount = NUM_THREADS;
+
+        pthread_create(&threads[i], NULL, spawnThread, &threadArgs[i]);
+    }
+
+    //wait for threads to finish processing
+    for(int i = 0; i < NUM_THREADS; i++)
+    {
+        pthread_join(threads[i], NULL);
+    }
 }
