@@ -1,5 +1,7 @@
 # continentalness testing
 
-code used from https://lodev.org/lodepng/ and https://github.com/Cubitect/cubiomes
+code credits
+https://github.com/Cubitect/cubiomes
+https://github.com/nothings/stb/blob/master/stb_ds.h
 
 thanks guys
