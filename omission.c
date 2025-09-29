@@ -165,7 +165,7 @@ void* spawnThread(void* arg)
     Pos2d *bufferSamplesFull0 = NULL;
     Pos2d *bufferSamplesFull1 = NULL;
 
-    for(uint64_t i = args->threadId; i < 1000000ULL; i += args->threadCount)
+    for(uint64_t i = args->threadId; i < 10000ULL; i += args->threadCount)
     {
         //if(inefficientScore(i, large, 1) > 0.007) continue;
         //climate init
@@ -180,6 +180,9 @@ void* spawnThread(void* arg)
         arrsetlen(bufferSamplesFull1, 0);
 
         //calculating
+        //double refs are passed because the array might be reallocated.
+        //the address of the buffers are constant. the value is not.
+        //the place it points is a pointer to another array
         omission0Tiling0a(&dpn, &buffer0a);
         omission1Triangle0b(&dpn, &buffer0a, &buffer0b);
         biomeSamples(&dpn, 2, 32768, 6553, -0.74, 1, &buffer0b, &bufferSamples0b0);
