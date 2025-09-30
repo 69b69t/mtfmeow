@@ -151,11 +151,17 @@ int contiguousCheck(DoublePerlinNoise* dpn, Pos2d samplePos)
         Pos2d key; //position
         int value; //is this position a shroom?
     }* posHashMap = NULL;
+
+    /*
+        CONTIG CHECK ALGO
+        test webhook
+    */
 }
 
 void* spawnThread(void* arg)
 {
-
+    //clean up the threading immensely.
+    //call threads and actually communicate with main thread
     struct
     {
         int threadId;
