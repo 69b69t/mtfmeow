@@ -141,6 +141,18 @@ int omission0Tiling0a(DoublePerlinNoise* dpn, Pos2d** outBuffer)
     return bufferLength;
 }
 
+int contiguousCheck(DoublePerlinNoise* dpn, Pos2d samplePos)
+{
+    //this will stay on CPU as it will be unruly to run on a GPU, and gets called quite rarely
+
+    //temporary struct
+    struct
+    {
+        Pos2d key; //position
+        int value; //is this position a shroom?
+    }* posHashMap = NULL;
+}
+
 void* spawnThread(void* arg)
 {
 
@@ -165,9 +177,9 @@ void* spawnThread(void* arg)
     Pos2d *bufferSamplesFull0 = NULL;
     Pos2d *bufferSamplesFull1 = NULL;
 
-    for(uint64_t i = args->threadId; i < 10000ULL; i += args->threadCount)
+    for(uint64_t i = args->threadId; i < 1000000ULL; i += args->threadCount)
     {
-        //if(inefficientScore(i, large, 1) > 0.007) continue;
+        if(inefficientScore(i, large, 1) > 0.1) continue;
         //climate init
         init_climate_seed(&dpn, octaves, i, large, -1);
 
@@ -194,13 +206,9 @@ void* spawnThread(void* arg)
 
         if(arrlen(bufferSamplesFull1) > 0)
         {
-            printf("\n%ld %d %d\n", i, bufferSamplesFull1[0].xPos, bufferSamplesFull1[0].zPos);
+            printf("%ld %d %d\n", i, bufferSamplesFull1[0].xPos, bufferSamplesFull1[0].zPos);
+            fflush(stdout);
         }
-        else
-        {
-            printf(".");
-        }
-        fflush(stdout);
     }
 
     return NULL;
