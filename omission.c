@@ -155,6 +155,7 @@ int contiguousCheck(DoublePerlinNoise* dpn, Pos2d samplePos)
     /*
         CONTIG CHECK ALGO
         test webhook... again!
+        okay seriously please work mr webhook
     */
 }
 
