@@ -144,13 +144,77 @@ int omission0Tiling0a(DoublePerlinNoise* dpn, Pos2d** outBuffer)
 int contiguousCheck(DoublePerlinNoise* dpn, Pos2d samplePos)
 {
     //this will stay on CPU as it will be unruly to run on a GPU, and gets called quite rarely
-
-    //temporary struct
-    struct
+    /*
+        pop position from queue
+        check that point
+            if in set, increment a counter
+        
+        if edge to check is not in visited
+            mark it as visited
+            add to q
+        else
+            skip neighbor
+        mark each edge as visited and throw into queue(only if in mushroom island)
+    */
+    typedef struct
     {
         Pos2d key; //position
-        int value; //is this position a shroom?
-    }* posHashMap = NULL;
+        uint8_t value; //dummy value so we can only use key
+    } PosMap;
+
+    PosMap* visited = NULL;
+    Pos2d* queue = NULL;
+
+    int size = 0;
+
+    //mark starting position as visited and put it in q
+    hmput(visited, samplePos, 0);
+    arrput(queue, samplePos);
+
+    while(arrlen(queue) != 0)
+    {
+        //pop last value in array
+        Pos2d lastVal = arrpop(queue);
+        double sample = sampleDoublePerlin(dpn, 18, (double)lastVal.xPos, (double)lastVal.zPos);
+
+        //if sample is in set, mark all neighbors as visited if not already, and add all not visited in q
+        //else, continue, reducing q by 1
+        if(sample > -1.05) continue;
+        if(size % 1000000 == 0) printf("queueLen:%ld visitedLen:%ld size:%d\n", arrlen(queue), hmlen(visited), size);
+        size++;
+
+        //put all neighbors into q, IF not in hashmap. 4 way connectivity
+        Pos2d temp;
+
+        //check neighbors. if they are already visited, ignore. else, put
+        //them in visited and queue position
+        temp = (Pos2d){lastVal.xPos - 1, lastVal.zPos};
+        if(hmgeti(visited, temp) == -1)
+        {
+            hmput(visited, temp, 0);
+            arrput(queue, temp);
+        }
+        temp = (Pos2d){lastVal.xPos + 1, lastVal.zPos};
+        if(hmgeti(visited, temp) == -1)
+        {
+            hmput(visited, temp, 0);
+            arrput(queue, temp);
+        }
+        temp = (Pos2d){lastVal.xPos, lastVal.zPos - 1};
+        if(hmgeti(visited, temp) == -1)
+        {
+            hmput(visited, temp, 0);
+            arrput(queue, temp);
+        }
+        temp = (Pos2d){lastVal.xPos, lastVal.zPos + 1};
+        if(hmgeti(visited, temp) == -1)
+        {
+            hmput(visited, temp, 0);
+            arrput(queue, temp);
+        }
+    }
+
+    return size;
 }
 
 void* spawnThread(void* arg)
@@ -216,6 +280,20 @@ void* spawnThread(void* arg)
 
 int main(int argc, char** argv)
 {
+    int large = 1;
+    DoublePerlinNoise dpn;
+    PerlinNoise octaves[18]; //this is all the noisemaps.
+    init_climate_seed(&dpn, octaves, -3653030542909635146ULL, large, -1);
+    Pos2d pos;
+    pos.xPos = -29906784;
+    pos.zPos = 21248874;
+
+    //1047 53969 -47498
+    int size = contiguousCheck(&dpn, pos);
+
+    printf("size is %d\n", size);
+    return 0;
+
     const int NUM_THREADS = 24;
     pthread_t threads[NUM_THREADS];
 
