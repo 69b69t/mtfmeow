@@ -62,7 +62,6 @@ int biomeSamples(DoublePerlinNoise* dpn, int octaveMax, //noise based things
         //after the check do stuff with the outBuffer to store it
         if(count >= countThreshold)
         {
-            
             temp.xPos = (int)(xSum / count);
             temp.zPos = (int)(zSum / count);
             //printf("%ld/%d = %d and %ld/%d = %d\n", xSum, count, temp.xPos, zSum, count, temp.zPos);
@@ -141,14 +140,13 @@ int omission0Tiling0a(DoublePerlinNoise* dpn, Pos2d** outBuffer)
     return bufferLength;
 }
 
-int contiguousCheck(DoublePerlinNoise* dpn, Pos2d samplePos)
+int floodFill(DoublePerlinNoise* dpn, Pos2d samplePos)
 {
     //this will stay on CPU as it will be unruly to run on a GPU, and gets called quite rarely
     /*
         pop position from queue
         check that point
             if in set, increment a counter
-        
         if edge to check is not in visited
             mark it as visited
             add to q
@@ -182,7 +180,6 @@ int contiguousCheck(DoublePerlinNoise* dpn, Pos2d samplePos)
         if(sample > -1.05) continue;
         if(size % 1000000 == 0) printf("queueLen:%ld visitedLen:%ld size:%d\n", arrlen(queue), hmlen(visited), size);
         size++;
-
         //put all neighbors into q, IF not in hashmap. 4 way connectivity
         Pos2d temp;
 
@@ -217,6 +214,21 @@ int contiguousCheck(DoublePerlinNoise* dpn, Pos2d samplePos)
     return size;
 }
 
+int contigCheck(DoublePerlinNoise* dpn,
+    int threshold, Pos2d** inBuffer, Pos2d** outBuffer)
+{
+    //printf("%ld positions got to contigCheck\n", arrlen(*inBuffer));
+    for(int i = 0; i < arrlen(*inBuffer); i++)
+    {
+        //printf("%d %d\n", (*inBuffer)[i].xPos, (*inBuffer)[i].zPos);
+        int size = floodFill(dpn, (*inBuffer)[i]);
+        if(size <= threshold)
+            arrpush(*outBuffer, (*inBuffer)[i]);
+    }
+
+    return arrlen(*outBuffer);
+}
+
 void* spawnThread(void* arg)
 {
 
@@ -240,6 +252,7 @@ void* spawnThread(void* arg)
     Pos2d *bufferSamples0b2 = NULL;
     Pos2d *bufferSamplesFull0 = NULL;
     Pos2d *bufferSamplesFull1 = NULL;
+    Pos2d *bufferContigCheck = NULL;
 
     for(uint64_t i = args->threadId; i < 1000000ULL; i += args->threadCount)
     {
@@ -254,6 +267,7 @@ void* spawnThread(void* arg)
         arrsetlen(bufferSamples0b2, 0);
         arrsetlen(bufferSamplesFull0, 0);
         arrsetlen(bufferSamplesFull1, 0);
+        arrsetlen(bufferContigCheck, 0);
 
         //calculating
         //double refs are passed because the array might be reallocated.
@@ -266,11 +280,12 @@ void* spawnThread(void* arg)
         biomeSamples(&dpn, 2, 32768, 1424, -0.74, 38, &bufferSamples0b1, &bufferSamples0b2);
         biomeSamples(&dpn, 18, 32768, 2048, -1.05, 9, &bufferSamples0b2, &bufferSamplesFull0);
         biomeSamples(&dpn, 18, 32768, 364, -1.05, 530, &bufferSamplesFull0, &bufferSamplesFull1);
-        //printf("bufferSamples0b2 is %d long\n", countSamples0b2);
+        contigCheck(&dpn, 50000000, &bufferSamplesFull0, &bufferContigCheck);
 
-        if(arrlen(bufferSamplesFull1) > 0)
+        if(arrlen(bufferContigCheck) > 0)
         {
-            printf("%ld %d %d\n", i, bufferSamplesFull1[0].xPos, bufferSamplesFull1[0].zPos);
+            printf("%ld %d %d\n", i, bufferContigCheck[0].xPos,
+                bufferContigCheck[0].zPos);
             fflush(stdout);
         }
     }
@@ -280,21 +295,7 @@ void* spawnThread(void* arg)
 
 int main(int argc, char** argv)
 {
-    int large = 1;
-    DoublePerlinNoise dpn;
-    PerlinNoise octaves[18]; //this is all the noisemaps.
-    init_climate_seed(&dpn, octaves, -3653030542909635146ULL, large, -1);
-    Pos2d pos;
-    pos.xPos = -29906784;
-    pos.zPos = 21248874;
-
-    //1047 53969 -47498
-    int size = contiguousCheck(&dpn, pos);
-
-    printf("size is %d\n", size);
-    return 0;
-
-    const int NUM_THREADS = 24;
+    const int NUM_THREADS = 1;
     pthread_t threads[NUM_THREADS];
 
     //create threadArgs
