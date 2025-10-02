@@ -1,9 +1,10 @@
+#ifndef CRUNCHLIB_CUH
+#define CRUNCHLIB_CUH
+
 #include <stdint.h>
-#include <math.h>
+#include "xoroLib.cuh"
 
-#include "crunchLib.h"
-
-inline void initOctaveSeeds(Xoroshiro *octASeed, Xoroshiro *octBSeed, uint64_t seed, int large)
+__device__ __forceinline__ void initOctaveSeeds(Xoroshiro *octASeed, Xoroshiro *octBSeed, uint64_t seed, int large)
 {
     //this gets the seeds for octaveA and octaveB
     Xoroshiro xr;
@@ -16,7 +17,7 @@ inline void initOctaveSeeds(Xoroshiro *octASeed, Xoroshiro *octBSeed, uint64_t s
     //xor with different constants for different maps
     // md5 "minecraft:continentalness" or "minecraft:continentalness_large"
     xr.lo = xlo ^ (large ? 0x9a3f51a113fce8dc : 0x83886c9d0ae3a662);
-    xr.hi = xhi ^ (large ? 0xee2dbd157e5dcdad : 0xafa638a61b42e8ad);
+    xr.hi = xhi ^ (large ? 0xafa638a61b42e8ad : 0xafa638a61b42e8ad);
 
     //gets new states for both octave a and b
     octASeed->lo = xNextLong(&xr);
@@ -25,9 +26,9 @@ inline void initOctaveSeeds(Xoroshiro *octASeed, Xoroshiro *octBSeed, uint64_t s
     octBSeed->hi = xNextLong(&xr);
 }
 
-inline double calculateCrunchiness(Xoroshiro state, int large, int octave)
+__device__ __forceinline__ double calculateCrunchiness(Xoroshiro state, int large, int octave)
 {
-    static const uint64_t md5_octave_n[][2] = {
+    __constant__ static const uint64_t md5_octave_n[][2] = {
         {0xb198de63a8012672, 0x7b84cad43ef7b5a8}, // md5 "octave_-12"
         {0x0fd787bfbc403ec3, 0x74a4a31ca21b48b8}, // md5 "octave_-11"
         {0x36d326eed40efeb2, 0x5be9ce18223c636a}, // md5 "octave_-10"
@@ -54,16 +55,8 @@ inline double calculateCrunchiness(Xoroshiro state, int large, int octave)
     return yOffset - floor(yOffset);
 }
 
-//INEFFICIENT. DONT USE IN HOT LOOPS
-inline double inefficientScore(uint64_t seed, int large, int maxOctave)
-{
-    Xoroshiro octaveSeedA, octaveSeedB;
-    initOctaveSeeds(&octaveSeedA, &octaveSeedB, seed, large);
-    return doubleMad(octaveSeedA, octaveSeedB, large, maxOctave);
-}
-
 //calculate MAD for octaves up to n
-inline double doubleMad(Xoroshiro octaveSeedA, Xoroshiro octaveSeedB, int large, int maxOctave)
+__device__ __forceinline__ double doubleMad(Xoroshiro octaveSeedA, Xoroshiro octaveSeedB, int large, int maxOctave)
 {
     const double weights[] = {1, 1, 2, 2, 2, 1, 1, 1, 1};
     double sum = 0.0;
@@ -81,7 +74,15 @@ inline double doubleMad(Xoroshiro octaveSeedA, Xoroshiro octaveSeedB, int large,
     return sum / weightSum;
 }
 
-inline uint64_t getNextValid(uint64_t startSeed, double threshold, int large, int maxOctave)
+//INEFFICIENT. DONT USE IN HOT LOOPS
+__device__ __forceinline__ double inefficientScore(uint64_t seed, int large, int maxOctave)
+{
+    Xoroshiro octaveSeedA, octaveSeedB;
+    initOctaveSeeds(&octaveSeedA, &octaveSeedB, seed, large);
+    return doubleMad(octaveSeedA, octaveSeedB, large, maxOctave);
+}
+
+__device__ __forceinline__ uint64_t getNextValid(uint64_t startSeed, double threshold, int large, int maxOctave)
 {
     Xoroshiro octASeed, octBSeed;
     uint64_t i = startSeed;
@@ -94,3 +95,5 @@ inline uint64_t getNextValid(uint64_t startSeed, double threshold, int large, in
     while(doubleMad(octASeed, octBSeed, large, maxOctave) > threshold);
     return i - 1;
 }
+
+#endif // CRUNCHLIB_CUH

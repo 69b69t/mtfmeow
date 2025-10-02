@@ -1,17 +1,45 @@
+#ifndef CONTLIB_CUH
+#define CONTLIB_CUH
+
 #include <stdint.h>
-#include <math.h>
+#include "xoroLib.cuh"
 
-#include "continentalnessLib.h"
+//typedefs
+//a single raw noisemap
+typedef struct
+{
+    uint8_t lookupHash[256+1]; //shuffled bytes
+    uint8_t yInt; //y offset floor
+    double xOffset, yOffset, zOffset; //offsets of the current noisemap. x y and z
+    double amplitude; //amplitude of the noisemap
+    double lacunarity; //frequency of the noisemap
+    double yOffsetFract; //y offset fractional
+    double yFractSmoothstep; //precomputed noisestep of something. maybe y offset?
+} PerlinNoise;
 
-//copies the cubiomes generation of the continentalness.
-//for mushroom biome searching
+//a bunch of stacked noisemaps
+typedef struct
+{
+    int octcnt; //number of octaves
+    PerlinNoise *octaves;
+} OctaveNoise;
 
-static inline double lerp(double part, double from, double to)
+//two octave noisemaps that get stacked
+typedef struct
+{
+    double amplitude;
+    OctaveNoise octA;
+    OctaveNoise octB;
+} DoublePerlinNoise;
+
+//==================HELPER_FUNCTIONS==================
+
+__device__ __forceinline__ double lerp(double part, double from, double to)
 {
     return from + part * (to - from);
 }
 
-static inline double indexedLerp(uint8_t idx, double a, double b, double c)
+__device__ __forceinline__ double indexedLerp(uint8_t idx, double a, double b, double c)
 {
     switch (idx & 0xf)
     {
@@ -38,7 +66,7 @@ static inline double indexedLerp(uint8_t idx, double a, double b, double c)
 //===================START_INIT=================
 
 //generate a randomly shuffled vector, and x y and z offsets
-void xPerlinInit(PerlinNoise *noise, Xoroshiro *xr)
+__device__ void xPerlinInit(PerlinNoise *noise, Xoroshiro *xr)
 {
     int i = 0;
     noise->xOffset = xNextDouble(xr) * 256.0;
@@ -87,12 +115,12 @@ void xPerlinInit(PerlinNoise *noise, Xoroshiro *xr)
     //noise->yFractSmoothstep = yOffsetFract;
 }
 
-int xOctaveInit(OctaveNoise *noise, Xoroshiro *xr, PerlinNoise *octaves, int minimumOctave, int nmax)
+__device__ int xOctaveInit(OctaveNoise *noise, Xoroshiro *xr, PerlinNoise *octaves, int minimumOctave, int nmax)
 {
     //this function initializes stacked octaves
 
     //bunch of constants that shall be xor'd with xrng state
-    static const uint64_t md5_octave_n[][2] = {
+    __constant__ static const uint64_t md5_octave_n[][2] = {
         {0xb198de63a8012672, 0x7b84cad43ef7b5a8}, // md5 "octave_-12"
         {0x0fd787bfbc403ec3, 0x74a4a31ca21b48b8}, // md5 "octave_-11"
         {0x36d326eed40efeb2, 0x5be9ce18223c636a}, // md5 "octave_-10"
@@ -109,7 +137,7 @@ int xOctaveInit(OctaveNoise *noise, Xoroshiro *xr, PerlinNoise *octaves, int min
     };
 
     //scalings
-    static const double lacuna_ini[] = { // -minimumOctave = 3..12
+    __constant__ static const double lacuna_ini[] = { // -minimumOctave = 3..12
         1, .5, .25, 1./8, 1./16, 1./32, 1./64, 1./128, 1./256, 1./512, 1./1024,
         1./2048, 1./4096,
     };
@@ -121,7 +149,7 @@ int xOctaveInit(OctaveNoise *noise, Xoroshiro *xr, PerlinNoise *octaves, int min
     uint64_t xhi = xNextLong(xr);
     int i;
 
-    static const double amplitudes[] = {1, 1, 2, 2, 2, 1, 1, 1, 1};
+    __constant__ static const double amplitudes[] = {1, 1, 2, 2, 2, 1, 1, 1, 1};
 
     for (i = 0; i < 9 && i != nmax; i++)
     {
@@ -141,7 +169,7 @@ int xOctaveInit(OctaveNoise *noise, Xoroshiro *xr, PerlinNoise *octaves, int min
     return i;
 }
 
-int xDoublePerlinInit(DoublePerlinNoise *noise, Xoroshiro *xr,
+__device__ int xDoublePerlinInit(DoublePerlinNoise *noise, Xoroshiro *xr,
         PerlinNoise *octaves, int minimumOctave, int nmax)
 {
     int n = 0, na = -1, nb = -1, len = 9;
@@ -162,14 +190,14 @@ int xDoublePerlinInit(DoublePerlinNoise *noise, Xoroshiro *xr,
     n += xOctaveInit(&noise->octB, xr, octaves+n, minimumOctave, nb);
 
 
-    static const double amp_ini[] = { // (5 ./ 3) * len / (len + 1), len = 2..9
+    __constant__ static const double amp_ini[] = { // (5 ./ 3) * len / (len + 1), len = 2..9
         0, 5./6, 10./9, 15./12, 20./15, 25./18, 30./21, 35./24, 40./27, 45./30,
     };
     noise->amplitude = amp_ini[len];
     return n;
 }
 
-void init_climate_seed(
+__device__ void init_climate_seed(
     DoublePerlinNoise *dpn, PerlinNoise *octaves,
     uint64_t seed, int large, int nmax
     )
@@ -193,7 +221,7 @@ void init_climate_seed(
 
 //sample single perlin noisemap. this takes a noisemap and x z coordinates
 //within the range 0.0 .. 256.0 on the y level 0
-double samplePerlin(const PerlinNoise *noise, double x, double z)
+__device__ double samplePerlin(const PerlinNoise *noise, double x, double z)
 {
     uint8_t xInt, yInt, zInt;
     double t1, yFractSmoothstep, t3;
@@ -260,7 +288,7 @@ double samplePerlin(const PerlinNoise *noise, double x, double z)
 }
 
 //sample stacked perlin noisemaps(one OctaveNoise)
-double sampleOctave(const OctaveNoise *noise, int octaveMax, double x, double z)
+__device__ double sampleOctave(const OctaveNoise *noise, int octaveMax, double x, double z)
 {
     double v = 0;
     int i;
@@ -278,7 +306,7 @@ double sampleOctave(const OctaveNoise *noise, int octaveMax, double x, double z)
 
 //sample together two stacked octave noisemaps to get the final continentalness
 //noisemap at a layer
-double sampleDoublePerlin(const DoublePerlinNoise *noise,
+__device__ double sampleDoublePerlin(const DoublePerlinNoise *noise,
         int octaveMax, double x, double z)
 {
     //biomes are actually sampled at 1:4. look here if scales are being weird
@@ -298,3 +326,5 @@ double sampleDoublePerlin(const DoublePerlinNoise *noise,
 }
 
 //END_SAMPLING
+
+#endif // CONTLIB_CUH
