@@ -26,21 +26,26 @@ typedef struct
 
 //==================DEVICE_FUNCTIONS==================
 
-__device__ void biomeSamples4(DoublePerlinNoise* dpn, uint64_t* seed, int octaveMax,
+// Consolidated biome sampling function to reduce code duplication
+__device__ bool biomeSamplesGeneric(DoublePerlinNoise* dpn, int octaveMax,
     int width, int density, double threshold, int countThreshold,
-    Pos2d inPos)
+    Pos2d inPos, Pos2d* outPos)
 {
-    int radius = width >> 1;
-    
-    //inPos
+    const int radius = width >> 1;
     int count = 0;
     int64_t xSum = 0;
     int64_t zSum = 0;
     
-    //scan a chunk of the world and count stuff
-    for(int x = -radius; x + density < radius; x += density)
+    // Pre-compute loop bounds
+    const int xStart = -radius;
+    const int xEnd = radius - density;
+    const int zStart = -radius;
+    const int zEnd = radius - density;
+    
+    // Scan world chunk
+    for(int x = xStart; x < xEnd; x += density)
     {
-        for(int z = -radius; z + density < radius; z += density)
+        for(int z = zStart; z < zEnd; z += density)
         {
             double sample = sampleDoublePerlin(dpn, octaveMax,
                 (double)(inPos.xPos + x), (double)(inPos.zPos + z));
@@ -54,200 +59,101 @@ __device__ void biomeSamples4(DoublePerlinNoise* dpn, uint64_t* seed, int octave
         }
     }
     
-    //printf("%d\n", count);
+    // Early exit if threshold not met
+    if(count < countThreshold)
+        return false;
+    
+    // Compute averaged position
+    outPos->xPos = (int)(xSum / count);
+    outPos->zPos = (int)(zSum / count);
+    return true;
+}
 
-    //if seed passes...
-    if(count >= countThreshold)
+__device__ void biomeSamples4(DoublePerlinNoise* dpn, uint64_t* seed, Pos2d inPos)
+{
+    Pos2d temp;
+    if(biomeSamplesGeneric(dpn, 18, 32768, 364, -1.05, 530, inPos, &temp))
     {
-        //get averaged points
-        Pos2d temp;
-        temp.xPos = (int)(xSum / count);
-        temp.zPos = (int)(zSum / count);
-
         printf("===== %ld %d %d =====\n", *seed, temp.xPos, temp.zPos);
     }
 }
 
-__device__ void biomeSamples3(DoublePerlinNoise* dpn, uint64_t* seed, int octaveMax,
-    int width, int density, double threshold, int countThreshold,
-    Pos2d inPos)
+__device__ void biomeSamples3(DoublePerlinNoise* dpn, uint64_t* seed, Pos2d inPos)
 {
-    int radius = width >> 1;
-    
-    //inPos
-    int count = 0;
-    int64_t xSum = 0;
-    int64_t zSum = 0;
-    
-    //scan a chunk of the world and count stuff
-    for(int x = -radius; x + density < radius; x += density)
+    Pos2d temp;
+    if(biomeSamplesGeneric(dpn, 18, 32768, 2048, -1.05, 9, inPos, &temp))
     {
-        for(int z = -radius; z + density < radius; z += density)
-        {
-            double sample = sampleDoublePerlin(dpn, octaveMax,
-                (double)(inPos.xPos + x), (double)(inPos.zPos + z));
-            
-            if(sample < threshold)
-            {
-                xSum += (inPos.xPos + x);
-                zSum += (inPos.zPos + z);
-                count++;
-            }
-        }
-    }
-    
-    //if seed passes...
-    if(count >= countThreshold)
-    {
-        //get averaged points
-        Pos2d temp;
-        temp.xPos = (int)(xSum / count);
-        temp.zPos = (int)(zSum / count);
         printf("%ld %d %d\n", *seed, temp.xPos, temp.zPos);
-        biomeSamples4(dpn, seed, 18, 32768, 364, -1.05, 530, temp);
+        biomeSamples4(dpn, seed, temp);
     }
 }
 
-__device__ void biomeSamples2(DoublePerlinNoise* dpn, uint64_t* seed, int octaveMax,
-    int width, int density, double threshold, int countThreshold,
-    Pos2d inPos)
+__device__ void biomeSamples2(DoublePerlinNoise* dpn, uint64_t* seed, Pos2d inPos)
 {
-    int radius = width >> 1;
-    
-    //inPos
-    int count = 0;
-    int64_t xSum = 0;
-    int64_t zSum = 0;
-    
-    //scan a chunk of the world and count stuff
-    for(int x = -radius; x + density < radius; x += density)
+    Pos2d temp;
+    if(biomeSamplesGeneric(dpn, 18, 32768, 1424, -0.74, 38, inPos, &temp))
     {
-        for(int z = -radius; z + density < radius; z += density)
-        {
-            double sample = sampleDoublePerlin(dpn, octaveMax,
-                (double)(inPos.xPos + x), (double)(inPos.zPos + z));
-            
-            if(sample < threshold)
-            {
-                xSum += (inPos.xPos + x);
-                zSum += (inPos.zPos + z);
-                count++;
-            }
-        }
-    }
-    
-    //if seed passes...
-    if(count >= countThreshold)
-    {
-        //get averaged points
-        Pos2d temp;
-        temp.xPos = (int)(xSum / count);
-        temp.zPos = (int)(zSum / count);
-        biomeSamples3(dpn, seed, 18, 32768, 2048, -1.05, 9, temp);
+        biomeSamples3(dpn, seed, temp);
     }
 }
 
-__device__ void biomeSamples1(DoublePerlinNoise* dpn, uint64_t* seed, int octaveMax,
-    int width, int density, double threshold, int countThreshold,
-    Pos2d inPos)
+__device__ void biomeSamples1(DoublePerlinNoise* dpn, uint64_t* seed, Pos2d inPos)
 {
-    int radius = width >> 1;
-    
-    //inPos
-    int count = 0;
-    int64_t xSum = 0;
-    int64_t zSum = 0;
-    
-    //scan a chunk of the world and count stuff
-    for(int x = -radius; x + density < radius; x += density)
+    Pos2d temp;
+    if(biomeSamplesGeneric(dpn, 2, 32768, 2978, -0.74, 9, inPos, &temp))
     {
-        for(int z = -radius; z + density < radius; z += density)
-        {
-            double sample = sampleDoublePerlin(dpn, octaveMax,
-                (double)(inPos.xPos + x), (double)(inPos.zPos + z));
-            
-            if(sample < threshold)
-            {
-                xSum += (inPos.xPos + x);
-                zSum += (inPos.zPos + z);
-                count++;
-            }
-        }
-    }
-    
-    //if seed passes...
-    if(count >= countThreshold)
-    {
-        //get averaged points
-        Pos2d temp;
-        temp.xPos = (int)(xSum / count);
-        temp.zPos = (int)(zSum / count);
-        biomeSamples2(dpn, seed, 2, 32768, 1424, -0.74, 38, temp);
+        biomeSamples2(dpn, seed, temp);
     }
 }
 
-__device__ void biomeSamples0(DoublePerlinNoise* dpn, uint64_t* seed, int octaveMax,
-    int width, int density, double threshold, int countThreshold,
-    Pos2d inPos)
+__device__ void biomeSamples0(DoublePerlinNoise* dpn, uint64_t* seed, Pos2d inPos)
 {
-    int radius = width >> 1;
-    
-    //inPos
-    int count = 0;
-    int64_t xSum = 0;
-    int64_t zSum = 0;
-    
-    //scan a chunk of the world and count stuff
-    for(int x = -radius; x + density < radius; x += density)
+    Pos2d temp;
+    if(biomeSamplesGeneric(dpn, 2, 32768, 6553, -0.74, 1, inPos, &temp))
     {
-        for(int z = -radius; z + density < radius; z += density)
-        {
-            double sample = sampleDoublePerlin(dpn, octaveMax,
-                (double)(inPos.xPos + x), (double)(inPos.zPos + z));
-            
-            if(sample < threshold)
-            {
-                xSum += (inPos.xPos + x);
-                zSum += (inPos.zPos + z);
-                count++;
-            }
-        }
-    }
-    
-    //if seed passes...
-    if(count >= countThreshold)
-    {
-        //get averaged points
-        Pos2d temp;
-        temp.xPos = (int)(xSum / count);
-        temp.zPos = (int)(zSum / count);
-        biomeSamples1(dpn, seed, 2, 32768, 2978, -0.74, 9, temp);
+        biomeSamples1(dpn, seed, temp);
     }
 }
 
 __device__ void omission1Triangle0b(DoublePerlinNoise* dpn, uint64_t* seed, Pos2d* checkPos)
 {
-    int octaveMax = 2;
-    int mostMinimum = (-30000000 / (1<<19)) * (1<<19);
+    const int octaveMax = 2;
+    const int mostMinimum = (-30000000 / (1<<19)) * (1<<19);
+    const int shift = (1 << 19);
+    const double threshold = -0.4;
     
-    for(int x = (mostMinimum + checkPos->xPos); x < 30000000; x += (1 << 19))
+    for(int x = (mostMinimum + checkPos->xPos); x < 30000000; x += shift)
     {
-        for(int z = (mostMinimum + checkPos->zPos); z < 30000000; z += (1 << 19))
+        for(int z = (mostMinimum + checkPos->zPos); z < 30000000; z += shift)
         {
             double sampleRight = sampleDoublePerlin(dpn, octaveMax,
                 (double)(x + 4096), (double)(z));
+            
+            // Early exit optimization - check most likely condition first
+            if(sampleRight < threshold)
+            {
+                Pos2d temp = {x, z};
+                biomeSamples0(dpn, seed, temp);
+                continue;
+            }
+            
             double sampleTopLeft = sampleDoublePerlin(dpn, octaveMax,
                 (double)(x - 2048), (double)(z + 3574));
+            
+            if(sampleTopLeft < threshold)
+            {
+                Pos2d temp = {x, z};
+                biomeSamples0(dpn, seed, temp);
+                continue;
+            }
+            
             double sampleBottomLeft = sampleDoublePerlin(dpn, octaveMax,
                 (double)(x - 2048), (double)(z - 3574));
             
-            if(sampleRight < -0.4 || sampleTopLeft < -0.4 || sampleBottomLeft < -0.4)
+            if(sampleBottomLeft < threshold)
             {
-                //next check
-                Pos2d temp;
-                temp.xPos = x;
-                temp.zPos = z;
-                biomeSamples0(dpn, seed, 2, 32768, 6553, -0.74, 1, temp);
+                Pos2d temp = {x, z};
+                biomeSamples0(dpn, seed, temp);
             }
         }
     }
@@ -255,18 +161,18 @@ __device__ void omission1Triangle0b(DoublePerlinNoise* dpn, uint64_t* seed, Pos2
 
 __device__ void omission0Tiling0a(DoublePerlinNoise* dpn, uint64_t* seed)
 {
-    int octaveMax = 1;
+    const int octaveMax = 1;
+    const int step = 32768;
+    const int limit = (1 << 19);
+    const double threshold = -0.275;
     
-    for(int x = 0; x < (1 << 19); x += 32768) {
-        for(int z = 0; z < (1 << 19); z += 32768) {
+    for(int x = 0; x < limit; x += step) {
+        for(int z = 0; z < limit; z += step) {
             double sample = sampleDoublePerlin(dpn, octaveMax, (double)x, (double)z);
             
-            if(sample < -0.275)
+            if(sample < threshold)
             {
-                Pos2d temp;
-                temp.xPos = x;
-                temp.zPos = z;
-                //call next thing
+                Pos2d temp = {x, z};
                 omission1Triangle0b(dpn, seed, &temp);
             }
         }
@@ -275,24 +181,25 @@ __device__ void omission0Tiling0a(DoublePerlinNoise* dpn, uint64_t* seed)
 
 //==================MAIN_KERNEL==================
 
-__global__ void processSeedsKernel(uint64_t startSeed, uint64_t numSeeds)
+__global__ void processSeedsKernel(uint64_t startSeed)
 {
     int idx = blockIdx.x * blockDim.x + threadIdx.x;
     int stride = gridDim.x * blockDim.x;
 
+    // Each thread gets its own noise structures
     DoublePerlinNoise dpn;
     PerlinNoise octaves[18];
 
-    for(uint64_t i = idx; i < numSeeds; i += stride)
+    for(uint64_t i = idx; ; i += stride)
     {
         uint64_t seed = startSeed + i;
-        int large = 1;
         
-        //quick crunchiness check
-        if(inefficientScore(seed, large, 1) > 0.01) continue;
+        // Quick crunchiness check - early rejection
+        if(inefficientScore(seed, 1, 1) > 0.01) 
+            continue;
         
         // Initialize noise structures
-        init_climate_seed(&dpn, octaves, seed, large, -1);
+        init_climate_seed(&dpn, octaves, seed, 1, -1);
         
         // Stage 0a: Initial tiling
         omission0Tiling0a(&dpn, &seed);
@@ -303,33 +210,29 @@ __global__ void processSeedsKernel(uint64_t startSeed, uint64_t numSeeds)
 
 int main(int argc, char** argv)
 {
-    const uint64_t TOTAL_SEEDS = 1000000ULL;
-    const int BATCH_SIZE = 100000;
-    
-    // Launch configuration
+    // Optimized launch configuration
     int blockSize = 256;
-    int numBlocks = 256; // Enough to keep GPU busy
+    int numBlocks;
     
-    printf("Processing %lu seeds with %d blocks of %d threads...\n", 
-        TOTAL_SEEDS, numBlocks, blockSize);
+    // Get device properties for optimal configuration
+    cudaDeviceProp prop;
+    CUDA_CHECK(cudaGetDeviceProperties(&prop, 0));
     
-    // Process in batches
-    for(uint64_t batch = 0; batch < TOTAL_SEEDS; batch += BATCH_SIZE)
-    {
-        uint64_t batchSize = (batch + BATCH_SIZE > TOTAL_SEEDS) ? 
-            (TOTAL_SEEDS - batch) : BATCH_SIZE;
-        
-
-        fflush(stdout);
-        
-        processSeedsKernel<<<blockSize, numBlocks>>>(batch, batchSize);
-
-        // Check for launch errors
-        cudaError_t err = cudaGetLastError();
-        if (err != cudaSuccess) {
-            printf("Kernel launch failed: %s\n", cudaGetErrorString(err));
-        }
-        CUDA_CHECK(cudaDeviceSynchronize());
+    // Calculate optimal number of blocks based on SM count
+    int minGridSize;
+    CUDA_CHECK(cudaOccupancyMaxPotentialBlockSize(&minGridSize, &blockSize, 
+                                                   processSeedsKernel, 0, 0));
+    numBlocks = minGridSize;
+    
+    printf("Processing seeds with %d blocks of %d threads...\n", numBlocks, blockSize);
+    printf("GPU: %s with %d SMs\n", prop.name, prop.multiProcessorCount);
+    
+    processSeedsKernel<<<numBlocks, blockSize>>>(0);
+    cudaError_t err = cudaGetLastError();
+    if (err != cudaSuccess) {
+        printf("Kernel launch failed: %s\n", cudaGetErrorString(err));
     }
+    CUDA_CHECK(cudaDeviceSynchronize());
+    
     return 0;
 }
