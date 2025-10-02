@@ -1,14 +1,20 @@
+#ifndef XOROLIB_CUH
+#define XOROLIB_CUH
+
 #include <stdint.h>
 
-#include "xoroLib.h"
-
 //==================RNG================
-uint64_t rotl64(uint64_t x, uint8_t b)
+typedef struct
+{
+    uint64_t lo, hi;
+} Xoroshiro;
+
+__device__ __forceinline__ uint64_t rotl64(uint64_t x, uint8_t b)
 {
     return (x << b) | (x >> (64-b));
 }
 
-void xSetSeed(Xoroshiro *xr, uint64_t value)
+__device__ void xSetSeed(Xoroshiro *xr, uint64_t value)
 {
     const uint64_t XL = 0x9e3779b97f4a7c15ULL;
     const uint64_t XH = 0x6a09e667f3bcc909ULL;
@@ -26,7 +32,7 @@ void xSetSeed(Xoroshiro *xr, uint64_t value)
     xr->hi = h;
 }
 
-uint64_t xNextLong(Xoroshiro *xr)
+__device__ uint64_t xNextLong(Xoroshiro *xr)
 {
     uint64_t l = xr->lo;
     uint64_t h = xr->hi;
@@ -37,7 +43,7 @@ uint64_t xNextLong(Xoroshiro *xr)
     return n;
 }
 
-int xNextInt(Xoroshiro *xr, uint32_t n)
+__device__ int xNextInt(Xoroshiro *xr, uint32_t n)
 {
     uint64_t r = (xNextLong(xr) & 0xFFFFFFFF) * n;
     if ((uint32_t)r < n)
@@ -50,9 +56,11 @@ int xNextInt(Xoroshiro *xr, uint32_t n)
     return r >> 32;
 }
 
-double xNextDouble(Xoroshiro *xr)
+__device__ double xNextDouble(Xoroshiro *xr)
 {
     return (xNextLong(xr) >> (64-53)) * 1.1102230246251565E-16;
 }
 
 //=================END_RNG==================
+
+#endif // XOROLIB_CUH
